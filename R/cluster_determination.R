@@ -100,7 +100,7 @@ FindClusters <- function(
   }
   if ((
     missing(x = genes.use) && missing(x = dims.use) && missing(x = k.param) &&
-    missing(x = k.scale) && missing(x = prune.SNN)  && missing(x = distance.matrix) 
+    missing(x = k.scale) && missing(x = prune.SNN)  && missing(x = distance.matrix)
     && snn.built) || reuse.SNN) {
     save.SNN <- TRUE
     if (reuse.SNN && !snn.built) {
@@ -550,8 +550,7 @@ globalVariables(
 #' @param genes.use Genes to use for the analysis. Default is the set of
 #' variable genes (object@@var.genes). Assumes pcs.use=NULL (tree calculated in
 #' gene expression space)
-#' @param pcs.use If set, tree is calculated in PCA space, using the
-#' eigenvalue-WeightedEucleideanDist distance across these PC scores.
+#' @param pcs.use If set, tree is calculated in PCA space.
 #' @param SNN.use If SNN is passed, build tree based on SNN graph connectivity between clusters
 #' @param do.plot Plot the resulting phylogenetic tree
 #' @param do.reorder Re-order identity classes (factor ordering), according to
@@ -559,6 +558,7 @@ globalVariables(
 #' helpful, for example, when drawing violin plots.
 #' @param reorder.numeric Re-order identity classes according to position on
 #' the tree, assigning a numeric value ('1' is the leftmost node)
+#' @param show.progress Show progress updates
 #'
 #' @return A Seurat object where the cluster tree is stored in
 #' object@@cluster.tree[[1]]
@@ -579,30 +579,23 @@ BuildClusterTree <- function(
   SNN.use = NULL,
   do.plot = TRUE,
   do.reorder = FALSE,
-  reorder.numeric = FALSE
+  reorder.numeric = FALSE,
+  show.progress = TRUE
 ) {
   genes.use <- SetIfNull(x = genes.use, default = object@var.genes)
   ident.names <- as.character(x = unique(x = object@ident))
   if (! is.null(x = genes.use)) {
     genes.use <- intersect(x = genes.use, y = rownames(x = object@data))
-    data.avg <- AverageExpression(object = object, genes.use = genes.use)
+    data.avg <- AverageExpression(
+      object = object,
+      genes.use = genes.use,
+      show.progress = show.progress
+    )
     data.dist <- dist(t(x = data.avg[genes.use, ]))
   }
   if (! is.null(x = pcs.use)) {
     data.pca <- AveragePCA(object = object)
-    data.use <- data.pca[pcs.use,]
-    if (is.null(x = object@pca.obj[[1]]$sdev)) {
-      data.eigenval <- (object@pca.obj[[1]]$d) ^ 2
-    } else {
-      data.eigenval <- (object@pca.obj[[1]]$sdev) ^ 2
-    }
-    data.weights <- (data.eigenval / sum(data.eigenval))[pcs.use]
-    data.weights <- data.weights / sum(data.weights)
-    data.dist <- CustomDistance(
-      my.mat = data.pca[pcs.use, ],
-      my.function = WeightedEuclideanDist,
-      w = data.weights
-    )
+    data.dist <- dist(t(x = data.pca[pcs.use,]))
   }
   if (! is.null(x = SNN.use)) {
     num.clusters <- length(x = ident.names)
@@ -651,7 +644,8 @@ BuildClusterTree <- function(
       genes.use = genes.use,
       pcs.use = pcs.use,
       do.plot = FALSE,
-      do.reorder = FALSE
+      do.reorder = FALSE,
+      show.progress = show.progress
     )
   }
   if (do.plot) {
@@ -764,4 +758,3 @@ KClustDimension <- function(
   }
   return(object)
 }
-
