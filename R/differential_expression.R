@@ -44,8 +44,9 @@ globalVariables(names = 'avg_logFC', package = 'Seurat', add = TRUE)
 #' Default is no downsampling. Not activated by default (set to Inf)
 #' @param random.seed Random seed for downsampling
 #' @param latent.vars Variables to test
-#' @param min.cells Minimum number of cells expressing the gene in at least one
-#' of the two groups
+#' @param min.cells.gene Minimum number of cells expressing the gene in at least one
+#' of the two groups, currently only used for poisson and negative binomial tests
+#' @param min.cells.group Minimum number of cells in one of the groups
 #' @param pseudocount.use Pseudocount to add to averaged expression values when
 #' calculating logFC. 1 by default.
 #' @param assay.type Type of assay to fetch data for (default is RNA)
@@ -60,6 +61,9 @@ globalVariables(names = 'avg_logFC', package = 'Seurat', add = TRUE)
 #' should be interpreted cautiously, as the genes used for clustering are the
 #' same genes tested for differential expression.
 #' @import pbapply
+#' @importFrom lmtest lrtest
+#'
+#' @seealso \code{\link{NegBinomDETest}}
 #'
 #' @export
 #'
@@ -81,7 +85,8 @@ FindMarkers <- function(
   max.cells.per.ident = Inf,
   random.seed = 1,
   latent.vars = "nUMI",
-  min.cells = 3,
+  min.cells.gene = 3,
+  min.cells.group = 3,
   pseudocount.use = 1,
   assay.type = "RNA",
   ...
@@ -121,11 +126,11 @@ FindMarkers <- function(
     print(paste("Cell group 2 is empty - no cells with identity class", ident.2))
     return(NULL)
   }
-  if (length(cells.1) < min.cells) {
-    stop(paste("Cell group 1 has fewer than", as.character(min.cells), "cells in identity class", ident.1))
+  if (length(cells.1) < min.cells.group) {
+    stop(paste("Cell group 1 has fewer than", as.character(min.cells.group), "cells in identity class", ident.1))
   }
-  if (length(cells.2) < min.cells) {
-    stop(paste("Cell group 2 has fewer than", as.character(min.cells), " cells in identity class", ident.2))
+  if (length(cells.2) < min.cells.group) {
+    stop(paste("Cell group 2 has fewer than", as.character(min.cells.group), " cells in identity class", ident.2))
   }
   # gene selection (based on percent expressed)
   thresh.min <- 0
@@ -232,7 +237,7 @@ FindMarkers <- function(
       genes.use = genes.use,
       latent.vars = latent.vars,
       print.bar = print.bar,
-      min.cells = min.cells
+      min.cells = min.cells.gene
     )
   }
   if (test.use == "poisson") {
@@ -243,8 +248,8 @@ FindMarkers <- function(
       cells.2 = cells.2,
       genes.use = genes.use,
       latent.vars = latent.vars,
-      print.bar = print.bar
-      # min.cells # PoissonDETest doesn't have something for min.cells
+      print.bar = print.bar,
+      min.cells = min.cells.gene
     )
   }
   if (test.use == "MAST") {
@@ -261,6 +266,17 @@ FindMarkers <- function(
 
   if (test.use == "wilcox") {
     to.return <- WilcoxDETest(
+      object = object,
+      assay.type = assay.type,
+      cells.1 = cells.1,
+      cells.2 = cells.2,
+      genes.use = genes.use,
+      print.bar = print.bar,
+      ...
+    )
+  }
+  if (test.use == "LR") {
+    to.return <- LRDETest(
       object = object,
       assay.type = assay.type,
       cells.1 = cells.1,
@@ -313,7 +329,9 @@ globalVariables(
 #' @param random.seed Random seed for downsampling
 #' @param return.thresh Only return markers that have a p-value < return.thresh, or a power > return.thresh (if the test is ROC)
 #' @param do.print FALSE by default. If TRUE, outputs updates on progress.
-#' @param min.cells Minimum number of cells expressing the gene in at least one of the two groups
+#' @param min.cells.gene Minimum number of cells expressing the gene in at least one
+#' of the two groups, currently only used for poisson and negative binomial tests
+#' @param min.cells.group Minimum number of cells in one of the groups
 #' @param latent.vars remove the effects of these variables
 #' @param assay.type Type of assay to perform DE for (default is RNA)
 #' @param \dots Additional parameters to pass to specific DE functions
@@ -339,7 +357,8 @@ FindAllMarkers <- function(
   return.thresh = 1e-2,
   do.print = FALSE,
   random.seed = 1,
-  min.cells = 3,
+  min.cells.gene = 3,
+  min.cells.group = 3,
   latent.vars = "nUMI",
   assay.type = "RNA",
   ...
@@ -372,7 +391,8 @@ FindAllMarkers <- function(
           min.pct = min.pct,
           min.diff.pct = min.diff.pct,
           print.bar = print.bar,
-          min.cells = min.cells,
+          min.cells.gene = min.cells.gene,
+          min.cells.group = min.cells.group,
           latent.vars = latent.vars,
           max.cells.per.ident = max.cells.per.ident,
           ...
@@ -411,10 +431,13 @@ FindAllMarkers <- function(
       }
     }
   }
-  if (only.pos) {
+  if ((only.pos) && nrow(gde.all) > 0) {
     return(subset(x = gde.all, subset = avg_logFC > 0))
   }
   rownames(x = gde.all) <- make.unique(names = as.character(x = gde.all$gene))
+  if(nrow(gde.all) == 0) {
+    warning("No DE genes identified.")
+  }
   return(gde.all)
 }
 
@@ -498,7 +521,9 @@ globalVariables(names = c('myAUC', 'p_val'), package = 'Seurat', add = TRUE)
 #' @param random.seed Random seed for downsampling
 #' @param return.thresh Only return markers that have a p-value < return.thresh, or a power > return.thresh (if the test is ROC)
 #' @param do.print Print status updates
-#' @param min.cells Minimum number of cells expressing the gene in at least one of the two groups
+#' @param min.cells.gene Minimum number of cells expressing the gene in at least one
+#' of the two groups, currently only used for poisson and negative binomial tests
+#' @param min.cells.group Minimum number of cells in one of the groups
 #' @param assay.type Type of assay to fetch data for (default is RNA)
 #' @param \dots Additional parameters to pass to specific DE functions
 #'
@@ -527,7 +552,8 @@ FindAllMarkersNode <- function(
   return.thresh = 1e-2,
   do.print = FALSE,
   random.seed = 1,
-  min.cells = 3,
+  min.cells.gene = 3,
+  min.cells.group = 3,
   assay.type = "RNA",
   ...
 ) {
@@ -565,7 +591,8 @@ FindAllMarkersNode <- function(
       only.pos = only.pos,
       max.cells.per.ident = max.cells.per.ident,
       random.seed = random.seed,
-      min.cells = min.cells
+      min.cells.gene = min.cells.gene,
+      min.cells.group = min.cells.group
     )
     if (do.print) {
       print(paste("Calculating node", i))
@@ -719,12 +746,10 @@ FindConservedMarkers <- function(
     MARGIN = 1,
     FUN = max
   )
-  combined.pval <- data.frame(cp = apply(X = markers.combined[, pval.codes],
-                                         MARGIN = 1,
-                                         FUN = function(x) meta.method(x)$p))
+  combined.pval <- data.frame(cp = apply(X = markers.combined[, pval.codes], MARGIN = 1, FUN = function(x) meta.method(x)$p))
   colnames(combined.pval) <- paste0(as.character(formals()$meta.method), "_p_val")
   markers.combined <- cbind(markers.combined, combined.pval)
-  markers.combined <- markers.combined[order(markers.combined[, paste0(as.character(formals()$meta.method), "_p_val")]), ]
+  markers.combined <- markers.combined[order(markers.combined[,paste0(as.character(formals()$meta.method), "_p_val")]), ]
   return(markers.combined)
 }
 
@@ -1125,8 +1150,6 @@ PoissonDETest <- function(
 #' @param object Seurat object
 #' @param cells.1 Group 1 cells
 #' @param cells.2 Group 2 cells
-#' @param min.cells Minimum number of cells expressing the gene in at least one
-#' of the two groups
 #' @param genes.use Genes to use for test
 #' @param latent.vars Confounding variables to adjust for in DE test. Default is
 #' "nUMI", which adjusts for cellular depth (i.e. cellular detection rate). For
@@ -1156,7 +1179,6 @@ MASTDETest <- function(
   object,
   cells.1,
   cells.2,
-  min.cells = 3,
   genes.use = NULL,
   latent.vars = NULL,
   assay.type = "RNA",
@@ -1227,8 +1249,6 @@ MASTDETest <- function(
 #' @param object Seurat object
 #' @param cells.1 Group 1 cells
 #' @param cells.2 Group 2 cells
-#' @param min.cells Minimum number of cells expressing the gene in at least one
-#' of the two groups
 #' @param genes.use Genes to use for test
 #' @param assay.type Type of assay to fetch data for (default is RNA)
 #' @param ... Extra parameters to pass to DESeq2::results
@@ -1257,7 +1277,6 @@ DESeq2DETest <- function(
   object,
   cells.1,
   cells.2,
-  min.cells = 3,
   genes.use = NULL,
   assay.type = "RNA",
   ...
@@ -1304,8 +1323,6 @@ DESeq2DETest <- function(
 #' @param object Seurat object
 #' @param cells.1 Group 1 cells
 #' @param cells.2 Group 2 cells
-#' @param min.cells Minimum number of cells expressing the gene in at least one
-#' of the two groups
 #' @param genes.use Genes to use for test
 #' @param print.bar Print a progress bar
 #' @param assay.type Type of assay to perform DE for (default is RNA)
@@ -1328,7 +1345,6 @@ WilcoxDETest <- function(
   object,
   cells.1,
   cells.2,
-  min.cells = 3,
   genes.use = NULL,
   print.bar = TRUE,
   assay.type = "RNA",
@@ -1349,6 +1365,42 @@ WilcoxDETest <- function(
     X = 1:nrow(x = countdata.test),
     FUN = function(x) {
       return(wilcox.test(countdata.test[x, ] ~ coldata$group, ...)$p.value)
+    }
+  )
+  genes.return <- rownames(x = countdata.test)
+  to.return <- data.frame(p_val, row.names = genes.return)
+  return(to.return)
+}
+
+
+LRDETest <- function(
+  object,
+  cells.1,
+  cells.2,
+  min.cells = 3,
+  genes.use = NULL,
+  print.bar = TRUE,
+  assay.type = "RNA",
+  ...
+) {
+  data.test <- GetAssayData(object = object, assay.type = assay.type, slot = "data")
+  genes.use <- SetIfNull(x = genes.use, default = rownames(x = data.test))
+  # check that the gene made it through the any filtering that was done
+  genes.use <- genes.use[genes.use %in% rownames(x = data.test)]
+  coldata <- object@meta.data[c(cells.1, cells.2), ]
+  coldata[cells.1, "group"] <- "Group1"
+  coldata[cells.2, "group"] <- "Group2"
+  coldata$group <- factor(x = coldata$group)
+  coldata$wellKey <- rownames(x = coldata)
+  countdata.test <- data.test[genes.use, rownames(x = coldata)]
+  mysapply <- if (print.bar) {pbsapply} else {sapply}
+  p_val <- mysapply(
+    X = 1:nrow(x = countdata.test),
+    FUN = function(x) {
+      model1 <- glm(coldata$group ~ countdata.test[x,],family = "binomial")
+      model2 <- glm(coldata$group ~ 1, family = "binomial")
+      lrtest <- lrtest(model1, model2)
+      return(lrtest$Pr[2])
     }
   )
   genes.return <- rownames(x = countdata.test)
