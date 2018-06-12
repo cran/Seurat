@@ -1,15 +1,15 @@
 Package: Seurat
-Version: 2.3.1
-Date: 2018-05-03
+Version: 2.3.2
+Date: 2018-06-11
 Title: Tools for Single Cell Genomics
 Description: A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) <doi:10.1038/nbt.3192>, Macosko E, Basu A, Satija R, et al (2015) <doi:10.1016/j.cell.2015.05.002>, and Butler A and Satija R (2017) <doi:10.1101/164889> for more details.
 Authors@R: c(
-  person(given = 'Rahul', family = 'Satija', email = 'rsatija@nygenome.org', role = 'aut'),
+  person(given = 'Rahul', family = 'Satija', email = 'rsatija@nygenome.org', role = 'aut', comment = c(ORCID = '0000-0001-9448-8833')),
   person(given = 'Andrew', family = 'Butler', email = 'abutler@nygenome.org', role = 'aut', comment = c(ORCID = '0000-0003-3608-0463')),
   person(given = 'Paul', family = 'Hoffman', email = 'seuratpackage@gmail.com', role = c('aut', 'cre'), comment = c(ORCID = '0000-0002-7693-8957')),
   person(given = 'Jeff', family = 'Farrell', email = 'jfarrell@g.harvard.edu', role = 'ctb'),
   person(given = 'Shiwei', family = 'Zheng', email = 'szheng@nygenome.org', role = 'ctb', comment = c(ORCID = '0000-0001-6682-6743')),
-  person(given = 'Christoph', family = 'Hafemeister', email = 'chafemeister@nygenome.org', role = 'ctb', comment = (ORCID = '0000-0001-6365-8254')),
+  person(given = 'Christoph', family = 'Hafemeister', email = 'chafemeister@nygenome.org', role = 'ctb', comment = c(ORCID = '0000-0001-6365-8254')),
   person(given = 'Patrick', family = 'Roelli', email = 'proelli@nygenome.org', role = 'ctb')
   )
 URL: http://www.satijalab.org/seurat,
@@ -23,7 +23,7 @@ Imports: methods, ROCR, stringr, mixtools, lars, ica, tsne, Rtsne, fpc,
         RColorBrewer, MASS, irlba, reshape2, gplots, gdata, Rcpp,
         tclust, ranger, dtw, SDMTools, plotly, diffusionMap, Hmisc,
         tidyr, ggridges, metap, lmtest, cluster, fitdistrplus, png,
-        doSNOW, reticulate, foreach
+        doSNOW, reticulate, foreach, hdf5r
 LinkingTo: Rcpp, RcppEigen, RcppProgress
 License: GPL-3 | file LICENSE
 LazyData: true
@@ -41,17 +41,17 @@ Collate: 'RcppExports.R' 'alignment.R' 'seurat.R' 'conversion.R' 'as.R'
         'spatial_internal.R' 'tSNE_project.R' 'utilities.R'
         'utilities_internal.R'
 RoxygenNote: 6.0.1
-Suggests: testthat, loomR, S4Vectors, SummarizedExperiment,
+Suggests: testthat, loomR, phateR, S4Vectors, SummarizedExperiment,
         SingleCellExperiment, MAST, DESeq2
 NeedsCompilation: yes
-Packaged: 2018-05-04 20:51:59 UTC; paul
-Author: Rahul Satija [aut],
+Packaged: 2018-06-12 15:33:59 UTC; paul
+Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Andrew Butler [aut] (<https://orcid.org/0000-0003-3608-0463>),
   Paul Hoffman [aut, cre] (<https://orcid.org/0000-0002-7693-8957>),
   Jeff Farrell [ctb],
   Shiwei Zheng [ctb] (<https://orcid.org/0000-0001-6682-6743>),
-  Christoph Hafemeister [ctb] (0000-0001-6365-8254),
+  Christoph Hafemeister [ctb] (<https://orcid.org/0000-0001-6365-8254>),
   Patrick Roelli [ctb]
 Maintainer: Paul Hoffman <seuratpackage@gmail.com>
 Repository: CRAN
-Date/Publication: 2018-05-05 06:29:52 UTC
+Date/Publication: 2018-06-12 16:09:48 UTC

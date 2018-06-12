@@ -22,7 +22,8 @@
 #' NULL will not set a seed.
 #' @param \dots Additional arguments to be passed to IRLBA
 #'
-#'@importFrom irlba irlba
+#' @importFrom irlba irlba
+#' @importFrom methods new
 #'
 #' @return Returns Seurat object with the PCA calculation stored in
 #' object@@dr$pca.
@@ -136,6 +137,7 @@ RunPCA <- function(
 #' @param reduction.key dimensional reduction key, specifies the string before the number for the dimension names. IC by default
 #' @param \dots Additional arguments to be passed to fastica
 #'
+#' @importFrom methods new
 #' @importFrom ica icafast icaimax icajade
 #'
 #' @return Returns Seurat object with an ICA calculation stored in
@@ -759,11 +761,17 @@ RunCCA <- function(
 #'
 #' @param object.list List of Seurat objects
 #' @param genes.use Genes to use in mCCA.
+#' @param add.cell.ids Vector of strings to pass to \code{\link{RenameCells}} to
+#' give unique cell names
 #' @param niter Number of iterations to perform. Set by default to 25.
 #' @param num.ccs Number of canonical vectors to calculate
 #' @param standardize standardize scale.data matrices to be centered (mean zero)
 #' and scaled to have a standard deviation of 1.
+#'
 #' @return Returns a combined Seurat object with the CCA stored in the @@dr$cca slot.
+#'
+#' @importFrom methods slot
+#'
 #' @export
 #'
 #' @examples
@@ -781,7 +789,14 @@ RunCCA <- function(
 #' # Print results
 #' PrintDim(pbmc_cca,reduction.type = 'cca')
 #'
-RunMultiCCA <- function(object.list, genes.use, niter = 25, num.ccs = 1, standardize = TRUE){
+RunMultiCCA <- function(
+  object.list,
+  genes.use,
+  add.cell.ids = NULL,
+  niter = 25,
+  num.ccs = 1,
+  standardize = TRUE
+) {
   set.seed(42)
   if(length(object.list) < 3){
     stop("Must give at least 3 objects/matrices for MultiCCA")
@@ -808,6 +823,21 @@ RunMultiCCA <- function(object.list, genes.use, niter = 25, num.ccs = 1, standar
   else{
     stop("input data not Seurat objects")
   }
+
+  if (!missing(add.cell.ids)) {
+    if (length(add.cell.ids) != length(object.list)) {
+      stop("add.cell.ids must have the same length as object.list")
+    }
+    object.list <- lapply(seq_along(object.list), function(i) {
+      RenameCells(object = object.list[[i]], add.cell.id = add.cell.ids[i])
+    })
+  }
+  names.list <- lapply(object.list, slot, name = "cell.names")
+  names.intersect <- Reduce(intersect, names.list)
+  if(length(names.intersect) > 0) {
+    stop("duplicate cell names detected, please set 'add.cell.ids'")
+  }
+
   num.sets <- length(mat.list)
   if(standardize){
     for (i in 1:num.sets){
@@ -1009,6 +1039,186 @@ RunDiffusion <- function(
   return(object)
 }
 
+#' Run PHATE
+#'
+#' PHATE is a data reduction method specifically designed for visualizing
+#' **high** dimensional data in **low** dimensional spaces.
+#' To run, you must first install the `phate` python
+#' package (e.g. via pip install phate). Details on this package can be
+#' found here: \url{https://github.com/KrishnaswamyLab/PHATE}. For a more in depth
+#' discussion of the mathematics underlying PHATE, see the bioRxiv paper here:
+#' \url{https://www.biorxiv.org/content/early/2017/12/01/120378}.
+#'
+#' @param object Seurat object
+#' @param cells.use Which cells to analyze (default, all cells)
+#' @param genes.use If set, run PHATE on this subset of genes.
+#' Not set (NULL) by default
+#' @param assay.type Assay to pull data for (default: 'RNA')
+#' @param max.dim Total number of dimensions to embed in PHATE.
+#' @param k int, optional, default: 15
+#' number of nearest neighbors on which to build kernel
+#' @param alpha int, optional, default: 10
+#' sets decay rate of kernel tails.
+#' If NA, alpha decaying kernel is not used
+#' @param use.alpha boolean, default: NA
+#' forces the use of alpha decaying kernel
+#' If NA, alpha decaying kernel is used for small inputs
+#' (n_samples < n_landmark) and not used otherwise
+#' @param n.landmark int, optional, default: 2000
+#' number of landmarks to use in fast PHATE
+#' @param potential.method string, optional, default: 'log'
+#' choose from 'log' and 'sqrt'
+#' which transformation of the diffusional operator is used
+#' to compute the diffusion potential
+#' @param t int, optional, default: 'auto'
+#' power to which the diffusion operator is powered
+#' sets the level of diffusion
+#' @param knn.dist.method string, optional, default: 'euclidean'.
+#' The desired distance function for calculating pairwise distances on the data.
+#' If 'precomputed', `data` is treated as a
+#' (n_samples, n_samples) distance or affinity matrix
+#' @param mds.method string, optional, default: 'metric'
+#' choose from 'classic', 'metric', and 'nonmetric'
+#' which MDS algorithm is used for dimensionality reduction
+#' @param mds.dist.method string, optional, default: 'euclidean'
+#' recommended values: 'euclidean' and 'cosine'
+#' @param t.max int, optional, default: 100.
+#' Maximum value of t to test for automatic t selection.
+#' @param npca int, optional, default: 100
+#' Number of principal components to use for calculating
+#' neighborhoods. For extremely large datasets, using
+#' n_pca < 20 allows neighborhoods to be calculated in
+#' log(n_samples) time.
+#' @param plot.optimal.t boolean, optional, default: FALSE
+#' If TRUE, produce a plot showing the Von Neumann Entropy
+#' curve for automatic t selection.
+#' @param verbose `int` or `boolean`, optional (default : 1)
+#' If `TRUE` or `> 0`, print verbose updates.
+#' @param n.jobs `int`, optional (default: 1)
+#' The number of jobs to use for the computation.
+#' If -1 all CPUs are used. If 1 is given, no parallel computing code is
+#' used at all, which is useful for debugging.
+#' For n_jobs below -1, (n.cpus + 1 + n.jobs) are used. Thus for
+#' n_jobs = -2, all CPUs but one are used
+#' @param seed.use int or `NA`, random state (default: `NA`)
+#' @param reduction.name dimensional reduction name, specifies the position in
+#' the object$dr list. phate by default
+#' @param reduction.key dimensional reduction key, specifies the string before
+#' the number for the dimension names. PHATE by default
+#' @param ... Additional arguments for `phateR::phate`
+#'
+#' @return Returns a Seurat object containing a PHATE representation
+#'
+#' @importFrom utils installed.packages
+#' @export
+#'
+#' @references Moon K, van Dijk D, Wang Z, Burkhardt D, Chen W, van den Elzen A,
+#' Hirn M, Coifman R, Ivanova N, Wolf G and Krishnaswamy S (2017).
+#' "Visualizing Transitions and Structure for High Dimensional Data
+#' Exploration." _bioRxiv_, pp. 120378. doi: 10.1101/120378
+#' (URL: http://doi.org/10.1101/120378),
+#' <URL: https://www.biorxiv.org/content/early/2017/12/01/120378>.
+#' @examples
+#' if (reticulate::py_module_available("phate")) {
+#'
+#' # Load data
+#' pbmc_small
+#'
+#' # Run PHATE with default parameters
+#' pbmc_small <- RunPHATE(object = pbmc_small)
+#' # Plot results
+#' DimPlot(object = pbmc_small, reduction.use = 'phate')
+#'
+#' # Try smaller `k` for a small dataset, and larger `t` for a noisy embedding
+#' pbmc_small <- RunPHATE(object = pbmc_small, k = 4, t = 12)
+#' # Plot results
+#' DimPlot(object = pbmc_small, reduction.use = 'phate')
+#'1
+#' # For increased emphasis on local structure, use sqrt potential
+#' pbmc_small <- RunPHATE(object = pbmc_small, potential.method='sqrt')
+#' # Plot results
+#' DimPlot(object = pbmc_small, reduction.use = 'phate')
+#' }
+#'
+RunPHATE <- function(
+  object,
+  cells.use = NULL,
+  genes.use = NULL,
+  assay.type = 'RNA',
+  max.dim = 2L,
+  k = 15,
+  alpha = 10,
+  use.alpha = NA,
+  n.landmark = 2000,
+  potential.method = "log",
+  t = "auto",
+  knn.dist.method = "euclidean",
+  mds.method = "metric",
+  mds.dist.method = "euclidean",
+  t.max = 100,
+  npca = 100,
+  plot.optimal.t = FALSE,
+  verbose = 1,
+  n.jobs = 1,
+  seed.use = NA,
+  reduction.name = "phate",
+  reduction.key = "PHATE",
+  ...
+) {
+  if (!'phateR' %in% rownames(x = installed.packages())) {
+    stop("Please install phateR")
+  }
+  data.use <- GetAssayData(object, assay.type = assay.type, slot = "scale.data")
+  if (!is.null(x = cells.use)) {
+    data.use <- data.use[, cells.use]
+  }
+  if (!is.null(x = genes.use)) {
+    data.use <- data.use[genes.use, ]
+  }
+  data.use <- t(x = data.use)
+  parameters.to.store <- as.list(x = environment(), all = TRUE)[names(x = formals(fun = "RunPHATE"))]
+  object <- SetCalcParams(
+    object = object,
+    calculation = "RunPHATE",
+    ... = parameters.to.store
+  )
+  phate_output <- phateR::phate(
+    data.use,
+    ndim = max.dim,
+    k = k,
+    alpha = alpha,
+    use.alpha = alpha,
+    n.landmark = n.landmark,
+    potential.method = potential.method,
+    t = t,
+    knn.dist.method = knn.dist.method,
+    init = NULL,
+    mds.method = mds.method,
+    mds.dist.method = mds.dist.method,
+    t.max = t.max,
+    npca = npca,
+    plot.optimal.t = plot.optimal.t,
+    verbose = verbose,
+    n.jobs = n.jobs,
+    seed = seed.use,
+    ...
+  )
+  phate_output <- as.matrix(x = phate_output)
+  colnames(x = phate_output) <- paste0(reduction.key, 1:ncol(x = phate_output))
+  object <- SetDimReduction(
+    object = object,
+    reduction.type = reduction.name,
+    slot = "cell.embeddings",
+    new.data = phate_output
+  )
+  object <- SetDimReduction(
+    object = object,
+    reduction.type = reduction.name,
+    slot = "key",
+    new.data = reduction.key
+  )
+  return(object)
+}
 
 #' Run UMAP
 #'
@@ -1045,13 +1255,15 @@ RunDiffusion <- function(
 #' @param metric metric: This determines the choice of metric used to measure
 #' distance in the input space. A wide variety of metrics are already coded, and
 #' a user defined function can be passed as long as it has been JITd by numba.
+#' @param seed.use Set a random seed. By default, sets the seed to 42. Setting
+#' NULL will not set a seed.
 #' @param ... Additional arguments to the umap
 #'
 #' @return Returns a Seurat object containing a UMAP representation
 #'
 #' @references McInnes, L, Healy, J, UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction, ArXiv e-prints 1802.03426, 2018
 #'
-#' @importFrom reticulate import py_module_available
+#' @importFrom reticulate import py_module_available py_set_seed
 #'
 #' @export
 #'
@@ -1077,10 +1289,15 @@ RunUMAP <- function(
   n_neighbors = 30L,
   min_dist = 0.3,
   metric = "correlation",
+  seed.use = 42,
   ...
 ) {
   if (!py_module_available(module = 'umap')) {
     stop("Cannot find UMAP, please install through pip (e.g. pip install umap-learn).")
+  }
+  if (!is.null(x = seed.use)) {
+    set.seed(seed = seed.use)
+    py_set_seed(seed = seed.use)
   }
   cells.use <- SetIfNull(x = cells.use, default = colnames(x = object@data))
   if (is.null(x = genes.use)) {
@@ -1111,7 +1328,7 @@ RunUMAP <- function(
     calculation = "RunUMAP",
     ... = parameters.to.store
   )
-  umap_import <- import("umap")
+  umap_import <- import(module = "umap", delay_load = TRUE)
   umap <- umap_import$UMAP(
     n_neighbors = as.integer(x = n_neighbors),
     n_components = as.integer(x = max.dim),
