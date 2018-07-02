@@ -1,6 +1,6 @@
 Package: Seurat
-Version: 2.3.2
-Date: 2018-06-11
+Version: 2.3.3
+Date: 2018-07-02
 Title: Tools for Single Cell Genomics
 Description: A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) <doi:10.1038/nbt.3192>, Macosko E, Basu A, Satija R, et al (2015) <doi:10.1016/j.cell.2015.05.002>, and Butler A and Satija R (2017) <doi:10.1101/164889> for more details.
 Authors@R: c(
@@ -18,13 +18,12 @@ BugReports: https://github.com/satijalab/seurat/issues
 Additional_repositories: https://mojaveazure.github.io/loomR
 Depends: R (>= 3.4.0), ggplot2, cowplot, Matrix (>= 1.2.14),
 SystemRequirements: Java (>= 6)
-Imports: methods, ROCR, stringr, mixtools, lars, ica, tsne, Rtsne, fpc,
-        ape, VGAM, pbapply, igraph, FNN, RANN, caret, dplyr,
-        RColorBrewer, MASS, irlba, reshape2, gplots, gdata, Rcpp,
-        tclust, ranger, dtw, SDMTools, plotly, diffusionMap, Hmisc,
-        tidyr, ggridges, metap, lmtest, cluster, fitdistrplus, png,
-        doSNOW, reticulate, foreach, hdf5r
-LinkingTo: Rcpp, RcppEigen, RcppProgress
+Imports: methods, ROCR, mixtools, lars, ica, tsne, Rtsne, fpc, ape,
+        pbapply, igraph, RANN, dplyr, RColorBrewer, MASS, irlba,
+        reshape2, gplots, Rcpp (>= 0.11.0), dtw, SDMTools, plotly,
+        diffusionMap, Hmisc, tidyr, ggridges, metap, lmtest, cluster,
+        fitdistrplus, png, doSNOW, reticulate, foreach, hdf5r
+LinkingTo: Rcpp (>= 0.11.0), RcppEigen, RcppProgress
 License: GPL-3 | file LICENSE
 LazyData: true
 Collate: 'RcppExports.R' 'alignment.R' 'seurat.R' 'conversion.R' 'as.R'
@@ -41,10 +40,11 @@ Collate: 'RcppExports.R' 'alignment.R' 'seurat.R' 'conversion.R' 'as.R'
         'spatial_internal.R' 'tSNE_project.R' 'utilities.R'
         'utilities_internal.R'
 RoxygenNote: 6.0.1
-Suggests: testthat, loomR, phateR, S4Vectors, SummarizedExperiment,
-        SingleCellExperiment, MAST, DESeq2
+Suggests: gdata, VGAM, tclust, testthat, caret, ranger, loomR, phateR,
+        S4Vectors, SummarizedExperiment, SingleCellExperiment, MAST,
+        DESeq2
 NeedsCompilation: yes
-Packaged: 2018-06-12 15:33:59 UTC; paul
+Packaged: 2018-07-02 16:29:06 UTC; paul
 Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Andrew Butler [aut] (<https://orcid.org/0000-0003-3608-0463>),
   Paul Hoffman [aut, cre] (<https://orcid.org/0000-0002-7693-8957>),
@@ -54,4 +54,4 @@ Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Patrick Roelli [ctb]
 Maintainer: Paul Hoffman <seuratpackage@gmail.com>
 Repository: CRAN
-Date/Publication: 2018-06-12 16:09:48 UTC
+Date/Publication: 2018-07-02 22:10:03 UTC
