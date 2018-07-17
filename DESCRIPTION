@@ -1,6 +1,6 @@
 Package: Seurat
-Version: 2.3.3
-Date: 2018-07-02
+Version: 2.3.4
+Date: 2018-07-16
 Title: Tools for Single Cell Genomics
 Description: A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) <doi:10.1038/nbt.3192>, Macosko E, Basu A, Satija R, et al (2015) <doi:10.1016/j.cell.2015.05.002>, and Butler A and Satija R (2017) <doi:10.1101/164889> for more details.
 Authors@R: c(
@@ -17,11 +17,10 @@ URL: http://www.satijalab.org/seurat,
 BugReports: https://github.com/satijalab/seurat/issues
 Additional_repositories: https://mojaveazure.github.io/loomR
 Depends: R (>= 3.4.0), ggplot2, cowplot, Matrix (>= 1.2.14),
-SystemRequirements: Java (>= 6)
 Imports: methods, ROCR, mixtools, lars, ica, tsne, Rtsne, fpc, ape,
         pbapply, igraph, RANN, dplyr, RColorBrewer, MASS, irlba,
         reshape2, gplots, Rcpp (>= 0.11.0), dtw, SDMTools, plotly,
-        diffusionMap, Hmisc, tidyr, ggridges, metap, lmtest, cluster,
+        Hmisc, httr, tidyr, ggridges, metap, lmtest, cluster,
         fitdistrplus, png, doSNOW, reticulate, foreach, hdf5r
 LinkingTo: Rcpp (>= 0.11.0), RcppEigen, RcppProgress
 License: GPL-3 | file LICENSE
@@ -34,17 +33,17 @@ Collate: 'RcppExports.R' 'alignment.R' 'seurat.R' 'conversion.R' 'as.R'
         'dimensional_reduction_internal.R'
         'dimensional_reduction_utilities.R' 'interaction.R'
         'jackstraw.R' 'jackstraw_internal.R' 'multi_modal.R'
-        'plotting.R' 'plotting_internal.R' 'plotting_utilities.R'
-        'preprocessing.R' 'preprocessing_internal.R'
-        'printing_utilities.R' 'scoring.R' 'snn.R' 'spatial.R'
-        'spatial_internal.R' 'tSNE_project.R' 'utilities.R'
-        'utilities_internal.R'
+        'not_used_yet.R' 'plotting.R' 'plotting_internal.R'
+        'plotting_utilities.R' 'preprocessing.R'
+        'preprocessing_internal.R' 'printing_utilities.R' 'scoring.R'
+        'snn.R' 'spatial.R' 'spatial_internal.R' 'tSNE_project.R'
+        'utilities.R' 'utilities_internal.R'
 RoxygenNote: 6.0.1
 Suggests: gdata, VGAM, tclust, testthat, caret, ranger, loomR, phateR,
-        S4Vectors, SummarizedExperiment, SingleCellExperiment, MAST,
-        DESeq2
+        S4Vectors, made4, SummarizedExperiment, SingleCellExperiment,
+        MAST, DESeq2, destiny
 NeedsCompilation: yes
-Packaged: 2018-07-02 16:29:06 UTC; paul
+Packaged: 2018-07-15 17:45:16 UTC; paul
 Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Andrew Butler [aut] (<https://orcid.org/0000-0003-3608-0463>),
   Paul Hoffman [aut, cre] (<https://orcid.org/0000-0002-7693-8957>),
@@ -54,4 +53,4 @@ Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Patrick Roelli [ctb]
 Maintainer: Paul Hoffman <seuratpackage@gmail.com>
 Repository: CRAN
-Date/Publication: 2018-07-02 22:10:03 UTC
+Date/Publication: 2018-07-20 10:14:52
