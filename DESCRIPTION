@@ -1,6 +1,6 @@
 Package: Seurat
-Version: 3.0.0
-Date: 2019-04-16
+Version: 3.0.1
+Date: 2019-05-16
 Title: Tools for Single Cell Genomics
 Description: A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) <doi:10.1038/nbt.3192>, Macosko E, Basu A, Satija R, et al (2015) <doi:10.1016/j.cell.2015.05.002>, and Butler A and Satija R (2017) <doi:10.1101/164889> for more details.
 Authors@R: c(
@@ -30,14 +30,14 @@ LazyData: true
 Collate: 'RcppExports.R' 'generics.R' 'clustering.R' 'visualization.R'
         'convenience.R' 'data.R' 'differential_expression.R'
         'dimensional_reduction.R' 'integration.R' 'objects.R'
-        'preprocessing.R' 'tree.R' 'utilities.R'
+        'preprocessing.R' 'tree.R' 'utilities.R' 'zzz.R'
 RoxygenNote: 6.1.1
 Encoding: UTF-8
 Suggests: loomR, testthat, hdf5r, S4Vectors, SummarizedExperiment,
         SingleCellExperiment, MAST, DESeq2, GenomicRanges,
         GenomeInfoDb, IRanges, rtracklayer
 NeedsCompilation: yes
-Packaged: 2019-04-15 20:07:02 UTC; paul
+Packaged: 2019-05-16 15:24:20 UTC; paul
 Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Andrew Butler [aut] (<https://orcid.org/0000-0003-3608-0463>),
   Paul Hoffman [aut, cre] (<https://orcid.org/0000-0002-7693-8957>),
@@ -48,4 +48,4 @@ Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Patrick Roelli [ctb]
 Maintainer: Paul Hoffman <nygcSatijalab@nygenome.org>
 Repository: CRAN
-Date/Publication: 2019-04-15 21:54:16 UTC
+Date/Publication: 2019-05-16 16:20:57 UTC
