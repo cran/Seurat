@@ -1,6 +1,6 @@
 Package: Seurat
-Version: 3.1.0
-Date: 2019-08-20
+Version: 3.1.1
+Date: 2019-09-23
 Title: Tools for Single Cell Genomics
 Description: A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) <doi:10.1038/nbt.3192>, Macosko E, Basu A, Satija R, et al (2015) <doi:10.1016/j.cell.2015.05.002>, and Butler A and Satija R (2017) <doi:10.1101/164889> for more details.
 Authors@R: c(
@@ -21,7 +21,7 @@ Additional_repositories: https://mojaveazure.github.io/loomR
 Depends: R (>= 3.4.0), methods,
 Imports: ape, cluster, cowplot, fitdistrplus, future, future.apply,
         ggplot2 (>= 3.0.0), ggrepel, ggridges, graphics, grDevices,
-        grid, ica, igraph, irlba, KernSmooth, leiden (>= 0.3.1),
+        grid, httr, ica, igraph, irlba, KernSmooth, leiden (>= 0.3.1),
         lmtest, MASS, Matrix (>= 1.2-14), metap, pbapply, plotly, png,
         RANN, RColorBrewer, Rcpp, RcppAnnoy, reticulate, rlang, ROCR,
         rsvd, Rtsne, scales, sctransform (>= 0.2.0), SDMTools, stats,
@@ -36,10 +36,11 @@ Collate: 'RcppExports.R' 'generics.R' 'clustering.R' 'visualization.R'
 RoxygenNote: 6.1.1
 Encoding: UTF-8
 Suggests: loomR, testthat, hdf5r, S4Vectors, SummarizedExperiment,
-        SingleCellExperiment, MAST, DESeq2, GenomicRanges,
-        GenomeInfoDb, IRanges, rtracklayer, monocle, Biobase, VGAM
+        SingleCellExperiment, MAST, DESeq2, BiocGenerics,
+        GenomicRanges, GenomeInfoDb, IRanges, rtracklayer, monocle,
+        Biobase, VGAM
 NeedsCompilation: yes
-Packaged: 2019-08-20 15:53:08 UTC; paul
+Packaged: 2019-09-23 15:14:36 UTC; paul
 Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Andrew Butler [aut] (<https://orcid.org/0000-0003-3608-0463>),
   Paul Hoffman [aut, cre] (<https://orcid.org/0000-0002-7693-8957>),
@@ -51,4 +52,4 @@ Author: Rahul Satija [aut] (<https://orcid.org/0000-0001-9448-8833>),
   Yuhan Hao [ctb] (<https://orcid.org/0000-0002-1810-0822>)
 Maintainer: Paul Hoffman <nygcSatijalab@nygenome.org>
 Repository: CRAN
-Date/Publication: 2019-08-20 21:40:08 UTC
+Date/Publication: 2019-10-03 12:40:02 UTC
