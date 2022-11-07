@@ -24,6 +24,7 @@
 #' @docType package
 #' @rdname Seurat-package
 #' @name Seurat-package
+#' @keywords internal
 #'
 "_PACKAGE"
 

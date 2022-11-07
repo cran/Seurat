@@ -17,6 +17,7 @@
 #' @rdname Assay-class
 #'
 #' @seealso \code{\link[SeuratObject:Assay]{SeuratObject::Assay-class}}
+#' @keywords internal
 #'
 NULL
 
@@ -35,6 +36,7 @@ NULL
 #' @rdname DimReduc-class
 #'
 #' @seealso \code{\link[SeuratObject:DimReduc]{SeuratObject::DimReduc-class}}
+#' @keywords internal
 #'
 NULL
 
@@ -52,6 +54,7 @@ NULL
 #' @rdname Graph-class
 #'
 #' @seealso \code{\link[SeuratObject:Graph]{SeuratObject::Graph-class}}
+#' @keywords internal
 #'
 NULL
 
@@ -69,6 +72,7 @@ NULL
 #' @rdname JackStrawData-class
 #'
 #' @seealso \code{\link[SeuratObject:JackStrawData]{SeuratObject::JackStrawData-class}}
+#' @keywords internal
 #'
 NULL
 
@@ -86,6 +90,7 @@ NULL
 #' @rdname Neighbor-class
 #'
 #' @seealso \code{\link[SeuratObject:Neighbor]{SeuratObject::Neighbor-class}}
+#' @keywords internal
 #'
 NULL
 
@@ -104,6 +109,7 @@ NULL
 #' @rdname Seurat-class
 #'
 #' @seealso \code{\link[SeuratObject:Seurat]{SeuratObject::Seurat-class}}
+#' @keywords internal
 #'
 NULL
 
@@ -121,6 +127,7 @@ NULL
 #' @rdname SeuratCommand-class
 #'
 #' @seealso \code{\link[SeuratObject:SeuratCommand]{SeuratObject::SeuratCommand-class}}
+#' @keywords internal
 #'
 NULL
 
@@ -138,6 +145,7 @@ NULL
 #' @rdname SpatialImage-class
 #'
 #' @seealso \code{\link[SeuratObject:SpatialImage]{SeuratObject::SpatialImage-class}}
+#' @keywords internal
 #'
 NULL
 
