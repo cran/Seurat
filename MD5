@@ -1,4 +1,4 @@
-8d5e0793335237e7f8387cae41c3f620 *DESCRIPTION
+2bc001e8c6e71f95ded38093eee4f9f2 *DESCRIPTION
 c2ef7c6f9278eb1816e1c98c41ea726b *LICENSE
 1275effdd75bf7fab9939dbbae94aed4 *NAMESPACE
 96fcf5fc9053f408c8ff54ad02fcdbe8 *NEWS.md
@@ -19,9 +19,9 @@ efab04b13270b3bbe958c1ee0312a651 *R/preprocessing.R
 d53600e67e80e5b892e8e40e34522589 *R/visualization.R
 1c48ca7cef41d12911b077a2b8da516e *R/zzz.R
 800bfe0b497511f0ec762098e177a250 *README.md
-20ddb51dabcbeed4e78a5990ad51ec0f *build/partial.rdb
-e84661f995a9f29d1a09ebcdc27d3a82 *data/cc.genes.rda
-55d7e35793436d5e91646d774d9f86c4 *data/cc.genes.updated.2019.rda
+7080893e02c49cd296d4424b9be55069 *build/partial.rdb
+6cfd3121264220c78de811519a2a3faa *data/cc.genes.rda
+ba234709615837506fb22e1f2a484d7b *data/cc.genes.updated.2019.rda
 b5e59c959809d6be32d83366230ab3b9 *inst/CITATION
 d07fe4eee5c09cc44e96c17e683cb10e *inst/extdata/pbmc_raw.txt
 7c36195b7392ae6314ce16350d5cee25 *man/AddAzimuthResults.Rd
@@ -231,7 +231,7 @@ d3a792f8147b4cc85d4174d9f1945f64 *src/RcppExports.cpp
 eeb4b89f57a28c13b7d353eac4f0f67a *src/data_manipulation.cpp
 531a0da4cef6f8521d98bac8b9160e1e *src/data_manipulation.h
 cee56bd61191250ef5ae907838891d4a *src/fast_NN_dist.cpp
-be7cbf63b6797d5d000871b4ca2c9e8c *src/integration.cpp
+2b0b1861ff5fe0e6ef22a7aeae5e877f *src/integration.cpp
 91debeffa7ebcac8c26af5d56d94ee0a *src/integration.h
 c86d8ffb7b0af9bd0ffe54222f0553f5 *src/snn.cpp
 694a8ab034ccab2c5f7c35bf47b3469e *src/snn.h
