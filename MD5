@@ -1,7 +1,7 @@
-73d834b36f6c5345faed9eaf23c807a7 *DESCRIPTION
+b6a93b79a3c345800d079480f6267f5a *DESCRIPTION
 c2ef7c6f9278eb1816e1c98c41ea726b *LICENSE
 e1a7395865ed09513a10653717e4d06d *NAMESPACE
-220d0aad97893c4a8e91bf13f683ab5c *NEWS.md
+181b3c852eac7a87c95454be301cb699 *NEWS.md
 2dc8d94314ead6f77537d1fe0fc272bc *R/RcppExports.R
 746ccef46cf255d0269779a55e8da66c *R/clustering.R
 d72ddf5ce3e2ab38cc731f3538f4fa0c *R/convenience.R
@@ -23,8 +23,8 @@ e0b9e49de2d782aac4bc82d70c58f67c *R/preprocessing5.R
 c392d9310ebb23cc7e68727ea8a9cb6e *R/visualization.R
 daed1f8c33ba13a786ce4407e06c3e88 *R/zzz.R
 1b0dbef32b8c22ef3092692efee72b50 *README.md
-725b9847483799717e630c42835b0829 *build/Seurat.pdf
-e48b89f3a33ce472d3170cfb16e4a2b6 *build/stage23.rdb
+4d36b244849a3a98e6862532093bbdcc *build/Seurat.pdf
+6aa3e0e7dfd444dc4c02ef9c773e3c81 *build/stage23.rdb
 e84661f995a9f29d1a09ebcdc27d3a82 *data/cc.genes.rda
 55d7e35793436d5e91646d774d9f86c4 *data/cc.genes.updated.2019.rda
 fb89a5cc1f14ad979196d34e85b6f11f *inst/CITATION
@@ -313,7 +313,7 @@ e16227edb3b0969510ffddeeed44ee13 *tests/testdata/visium_hd/binned_outputs/square
 0a75db145a45197a2262cb1b83938124 *tests/testthat/test_data_manipulation.R
 ef95a904087d67497481a584847d7d0a *tests/testthat/test_differential_expression.R
 4a57b960de9fcefb6be3936800292e3c *tests/testthat/test_dimensional_reduction.R
-7d84494428b0e214f672ab4fcefc9e1f *tests/testthat/test_find_clusters.R
+ed116e01a950303f966f4da837eecacf *tests/testthat/test_find_clusters.R
 7e5d7eb8a146b55f92f046c3cf503636 *tests/testthat/test_integratedata.R
 4a3e421480b45332627cb12c5187e006 *tests/testthat/test_integration.R
 fcf04aab9317ad572cb3fd95f13438f3 *tests/testthat/test_integration5.R
