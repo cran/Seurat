@@ -1,5 +1,4 @@
 #' @include generics.R
-#' @importFrom SeuratObject PackageCheck
 #'
 NULL
 
@@ -215,7 +214,7 @@ AddModuleScore.Seurat <- function(
 #' @concept utilities
 #' @rdname AddModuleScore
 #' @method AddModuleScore StdAssay
-#' 
+#'
 #' @references Tirosh et al, Science (2016)
 #'
 AddModuleScore.StdAssay <- function(
@@ -262,8 +261,8 @@ AddModuleScore.StdAssay <- function(
   return(features.scores.use)
 }
 
-#' 
-#' @param kmeans.obj A \code{DoKMeans} output used to define feature clusters 
+#'
+#' @param kmeans.obj A \code{DoKMeans} output used to define feature clusters
 #' when \code{k = TRUE}; ignored if \code{k = FALSE}.
 #' @export
 #' @concept utilities
@@ -271,7 +270,7 @@ AddModuleScore.StdAssay <- function(
 #' @method AddModuleScore Assay
 #'
 #' @importFrom ggplot2 cut_number
-#' 
+#'
 AddModuleScore.Assay <- function(
     object,
     features,
@@ -286,7 +285,7 @@ AddModuleScore.Assay <- function(
     slot = 'data',
     ...
 ) {
-  assay.data <- GetAssayData(object = object, slot = slot)
+  assay.data <- GetAssayData(object = object, layer = slot)
   features.old <- features
   if (k) {
     .NotYetUsed(arg = 'k')
@@ -1062,7 +1061,7 @@ GroupCorrelation <- function(
     min.cells = min.cells,
     ngroups = ngroups
   )
-  data <- as.matrix(x = GetAssayData(object = object[[assay]], slot = slot))
+  data <- as.matrix(x = GetAssayData(object = object[[assay]], layer = slot))
   data <- data[rowMeans(x = data) != 0, ]
   grp.cors <- apply(
     X = data,
@@ -1172,7 +1171,7 @@ MetaFeature <- function(
 ) {
   cells <- cells %||% colnames(x = object)
   assay <- assay %||% DefaultAssay(object = object)
-  newmat <- GetAssayData(object = object, assay = assay, slot = slot)
+  newmat <- GetAssayData(object = object, assay = assay, layer = slot)
   newmat <- newmat[features, cells]
   if (slot == 'scale.data') {
     newdata <- Matrix::colMeans(newmat)
@@ -1561,7 +1560,7 @@ PseudobulkExpression.Seurat <- function(
         paste0(colnames(x = data)[which(num.levels <= 1)], collapse = ", ")
       )
     )
-    group.by <- colnames(x = data)[which(num.levels > 1)]
+    group.by <- rev(colnames(x = data)[which(num.levels > 1)])
     data <- data[, which(num.levels > 1), drop = F]
   }
   data.return <- list()
@@ -2537,6 +2536,44 @@ OldParamHints <- function(param) {
   return(param.conversion[param])
 }
 
+
+
+# Restore previous seed when needed in `RunLeiden`
+#
+# @param seed old seed
+#
+# @author Benjamin Parks
+# @references from BPCells package
+# https://github.com/bnprks/BPCells/blob/f2026c3509f5e2542f7624bdaf75669d5d45d78b/r/R/utils.R#L18
+#
+
+restore_seed <- function(seed) {
+  if (is.null(seed)) {
+    rm(".Random.seed", envir = globalenv(), inherits = FALSE)
+  } else {
+    assign(".Random.seed", seed, envir = globalenv(), inherits = FALSE)
+  }
+}
+
+
+# Get current seed when needed in `RunLeiden`
+#
+# @param seed current seed
+#
+# @author Benjamin Parks
+# @references from BPCells package
+# https://github.com/bnprks/BPCells/blob/f2026c3509f5e2542f7624bdaf75669d5d45d78b/r/R/utils.R#L10
+#
+
+get_seed <- function() {
+  if (exists(".Random.seed", globalenv(), mode = "integer", inherits = FALSE)) {
+    return(get(".Random.seed", globalenv(), mode = "integer", inherits = FALSE))
+  } else {
+    return(NULL)
+  }
+}
+
+
 # Check if a web resource is available
 #
 # @param url A URL
@@ -3017,7 +3054,7 @@ CreateCategoryMatrix <- function(
 #' Construct an assay for spatial niche analysis
 #'
 #' This function will construct a new assay where each feature is a
-#' cell label The values represents the sum of a particular cell label
+#' cell label. The values represent the sum of a particular cell label
 #' neighboring a given cell.
 #'
 #' @param object A Seurat object
@@ -3026,7 +3063,8 @@ CreateCategoryMatrix <- function(
 #' @param assay Name for spatial neighborhoods assay
 #' @param cluster.name Name of output clusters
 #' @param neighbors.k Number of neighbors to consider for each cell
-#' @param niches.k Number of clusters to return based on the niche assay
+#' @param niches.k Number of niche clusters to construct
+#' @param ... Extra parameters passed to \code{\link{kmeans}}
 #'
 #' @importFrom stats kmeans
 #' @return Seurat object containing a new assay
@@ -3040,7 +3078,8 @@ BuildNicheAssay <- function(
   assay = "niche",
   cluster.name = "niches",
   neighbors.k = 20,
-  niches.k = 4
+  niches.k = 4,
+  ...
 ) {
   # initialize an empty cells x groups binary matrix
   cells <- Cells(object[[fov]])
@@ -3075,7 +3114,8 @@ BuildNicheAssay <- function(
   results <- kmeans(
     x = t(object[[assay]]@scale.data),
     centers = niches.k,
-    nstart = 30
+    nstart = 30,
+    ...
   )
   object[[cluster.name]] <- results[["cluster"]]
 

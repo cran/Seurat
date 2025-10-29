@@ -132,7 +132,7 @@ DimHeatmap <- function(
     object = object,
     vars = features.keyed,
     cells = unique(x = unlist(x = cells)),
-    slot = slot
+    layer = slot
   )
   data.all <- MinMax(data = data.all, min = disp.min, max = disp.max)
   data.limits <- c(min(data.all), max(data.all))
@@ -220,7 +220,7 @@ DimHeatmap <- function(
 #' @importFrom stats median
 #' @importFrom scales hue_pal
 #' @importFrom ggplot2 annotation_raster coord_cartesian scale_color_manual
-#' ggplot_build aes_string geom_text
+#' ggplot_build geom_text
 #' @importFrom patchwork wrap_plots
 #' @export
 #' @concept visualization
@@ -270,14 +270,14 @@ DoHeatmap <- function(
     bad.features <- features[!features %in% possible.features]
     features <- features[features %in% possible.features]
     if(length(x = features) == 0) {
-      stop("No requested features found in the ", slot, " slot for the ", assay, " assay.")
+      stop("No requested features found in the ", slot, " layer for the ", assay, " assay.")
     }
     warning("The following features were omitted as they were not found in the ", slot,
-            " slot for the ", assay, " assay: ", paste(bad.features, collapse = ", "))
+            " layer for the ", assay, " assay: ", paste(bad.features, collapse = ", "))
   }
   data <- as.data.frame(x = as.matrix(x = t(x = GetAssayData(
     object = object,
-    slot = slot)[features, cells, drop = FALSE])))
+    layer = slot)[features, cells, drop = FALSE])))
   object <- suppressMessages(expr = StashIdent(object = object, save.name = 'ident'))
   group.by <- group.by %||% 'ident'
   groups.use <- object[[group.by]][cells, , drop = FALSE]
@@ -401,7 +401,7 @@ DoHeatmap <- function(
         plot <- plot + geom_text(
           stat = "identity",
           data = label.x.pos,
-          aes_string(label = 'group', x = 'label.x.pos'),
+          aes(label = .data[['group']], x = .data[['label.x.pos']]),
           y = y.max + y.max * 0.03 * 0.5 + vjust,
           angle = angle,
           hjust = hjust,
@@ -483,7 +483,7 @@ HTOHeatmap <- function(
     feature.order = rev(x = singlet.ids),
     cell.order = names(x = sort(x = Idents(object = object))),
     group.by = Idents(object = object)
-  ) + guides(color = FALSE)
+  ) + guides(color = "none")
   return(plot)
 }
 
@@ -650,7 +650,7 @@ VlnPlot <- function(
   if (is.null(layer) && length(layer.set) == 1 && layer.set == 'scale.data'){
     warning('Default search for "data" layer yielded no results; utilizing "scale.data" layer instead.')
   }
-  assay.name <- DefaultAssay(object)
+  assay.name <- assay %||% DefaultAssay(object = object)
   if (is.null(layer.set) & is.null(layer) ) {
     warning('Default search for "data" layer in "', assay.name, '" assay yielded no results; utilizing "counts" layer instead.',
             call. = FALSE, immediate. = TRUE)
@@ -836,8 +836,8 @@ ColorDimSplit <- function(
 #' ggplot object. If \code{FALSE}, return a list of ggplot objects
 #' @param raster Convert points to raster format, default is \code{NULL} which
 #' automatically rasterizes if plotting more than 100,000 cells
-#' @param raster.dpi Pixel resolution for rasterized plots, passed to geom_scattermore().
-#' Default is c(512, 512).
+#' @param raster.dpi Pixel resolution for rasterized plots, passed to geom_scattermore(). Default is c(512, 512).
+#' @param label.size.cutoff Clusters with fewer cells than the cutoff are not labeled (replaced with ' ' label)
 #'
 #' @return A \code{\link[patchwork]{patchwork}ed} ggplot object if
 #' \code{combine = TRUE}; otherwise, a list of ggplot objects
@@ -888,7 +888,8 @@ DimPlot <- function(
   ncol = NULL,
   combine = TRUE,
   raster = NULL,
-  raster.dpi = c(512, 512)
+  raster.dpi = c(512, 512),
+  label.size.cutoff = 0
 ) {
   if (!is_integerish(x = dims, n = 2L, finite = TRUE) || !all(dims > 0L)) {
     abort(message = "'dims' must be a two-length integer vector")
@@ -904,14 +905,38 @@ DimPlot <- function(
   # data <- Embeddings(object = object[[reduction]])[cells, dims]
   # data <- as.data.frame(x = data)
   dims <- paste0(Key(object = object[[reduction]]), dims)
+
+  # directly get embeddings to avoid name collisions
+  embed <- Embeddings(object[[reduction]])[cells, dims, drop = FALSE]
+  embed <- as.data.frame(embed)
+
   orig.groups <- group.by
   group.by <- group.by %||% 'ident'
-  data <- FetchData(
+
+  if (label & (label.size.cutoff > 0)) {
+    labels <- FetchData(object, group.by)
+    for(i in seq_along(group.by)) {
+      grouping_var <- group.by[i]
+      label_table <- table(labels[,grouping_var])
+      invalid_labels <- names(which(label_table < label.size.cutoff))
+      labels[, i] <- as.character(labels[,i])
+      labels[which(labels[,grouping_var] %in% invalid_labels),grouping_var] <- ' '
+      colnames(labels)[i] <- paste0(colnames(labels)[i], "_filtered")
+    }
+    object <- AddMetaData(object,labels)
+    group.by <- colnames(labels)
+  }
+
+  meta <- FetchData(
     object = object,
-    vars = c(dims, group.by),
+    vars = group.by,
     cells = cells,
     clean = 'project'
   )
+
+  # Combine embeddigns and metadata
+  data <- cbind(embed, meta)
+
   # cells <- rownames(x = object)
   # object[['ident']] <- Idents(object = object)
   # orig.groups <- group.by
@@ -1021,6 +1046,7 @@ DimPlot <- function(
 #' }
 #' @param min.cutoff,max.cutoff Vector of minimum and maximum cutoff values for each feature,
 #'  may specify quantile in the form of 'q##' where '##' is the quantile (eg, 'q1', 'q10')
+#' @param stroke.size Adjust stroke (outline) size of points
 #' @param split.by A factor in object metadata to split the plot by, pass 'ident'
 #' to split by cell identity
 #' @param keep.scale How to handle the color scale across multiple plots. Options are:
@@ -1085,6 +1111,7 @@ FeaturePlot <- function(
   },
   pt.size = NULL,
   alpha = 1,
+  stroke.size = NULL,
   order = FALSE,
   min.cutoff = NA,
   max.cutoff = NA,
@@ -1193,7 +1220,7 @@ FeaturePlot <- function(
     object = object,
     vars = c(dims, 'ident', features),
     cells = cells,
-    slot = slot
+    layer = slot
   )
   # Check presence of features/dimensions
   if (ncol(x = data) < 4) {
@@ -1347,6 +1374,7 @@ FeaturePlot <- function(
         order = order,
         pt.size = pt.size,
         alpha = alpha,
+        stroke.size = stroke.size,
         cols = cols.use,
         shape.by = shape.by,
         label = FALSE,
@@ -1613,7 +1641,7 @@ IFeaturePlot <- function(object, feature, dims = c(1, 2), reduction = NULL, slot
   }
   features <- sort(x = rownames(x = GetAssayData(
     object = object,
-    slot = slot,
+    layer = slot,
     assay = assay
   )))
   assays.use <- vapply(
@@ -1621,7 +1649,7 @@ IFeaturePlot <- function(object, feature, dims = c(1, 2), reduction = NULL, slot
     FUN = function(x) {
       return(!IsMatrixEmpty(x = GetAssayData(
         object = object,
-        slot = slot,
+        layer = slot,
         assay = x
       )))
     },
@@ -1701,7 +1729,7 @@ IFeaturePlot <- function(object, feature, dims = c(1, 2), reduction = NULL, slot
   )
   # Prepare plotting data
   dims <- paste0(Key(object = object[[reduction]]), dims)
-  plot.data <- FetchData(object = object, vars = c(dims, feature), slot = slot)
+  plot.data <- FetchData(object = object, vars = c(dims, feature), layer = slot)
   # Shiny server
   server <- function(input, output, session) {
     plot.env <- reactiveValues(
@@ -1720,7 +1748,7 @@ IFeaturePlot <- function(object, feature, dims = c(1, 2), reduction = NULL, slot
       feature.use <- input$feature
       features.assay <- sort(x = rownames(x = GetAssayData(
         object = object,
-        slot = slot,
+        layer = slot,
         assay = assay
       )))
       feature.use <- ifelse(
@@ -1772,7 +1800,7 @@ IFeaturePlot <- function(object, feature, dims = c(1, 2), reduction = NULL, slot
         expr = FetchData(
           object = object,
           vars = c(dims, feature.keyed),
-          slot = slot
+          layer = slot
         ),
         warning = function(...) {
           return(plot.env$data)
@@ -1994,7 +2022,7 @@ CellScatter <- function(
 #'
 #' @return A ggplot object
 #'
-#' @importFrom ggplot2 geom_smooth aes_string facet_wrap vars sym labs
+#' @importFrom ggplot2 geom_smooth facet_wrap vars sym labs
 #' @importFrom patchwork wrap_plots
 #'
 #' @export
@@ -2039,12 +2067,12 @@ FeatureScatter <- function(
     object = object,
     vars = c(feature1, feature2, group.by),
     cells = cells,
-    slot = slot
+    layer = slot
   )
-  if (!grepl(pattern = feature1, x = names(x = data)[1])) {
+  if (!grepl(pattern = feature1, x = names(x = data)[1], fixed = TRUE)) {
     abort(message = paste("Feature 1", sQuote(x = feature1), "not found"))
   }
-  if (!grepl(pattern = feature2, x = names(x = data)[2])) {
+  if (!grepl(pattern = feature2, x = names(x = data)[2], fixed = TRUE)) {
     abort(message = paste("Feature 2", sQuote(x = feature2), "not found"))
   }
   feature1 <-  names(x = data)[1]
@@ -3590,7 +3618,9 @@ ISpatialDimPlot <- function(
           df = plot.data,
           coordinfo = InvertCoordinate(x = input$click),
           threshold = 10,
-          maxpoints = 1
+          maxpoints = 1,
+          xvar = "y",
+          yvar = "x"
         )
         plot.env$data <- if (nrow(x = clicked) == 1) {
           cell.clicked <- rownames(x = clicked)
@@ -3630,7 +3660,9 @@ ISpatialDimPlot <- function(
           df = plot.data,
           coordinfo = InvertCoordinate(x = input$hover),
           threshold = 10,
-          maxpoints = 1
+          maxpoints = 1,
+          xvar = "y",
+          yvar = "x"
         )
         if (nrow(hovered) == 1) {
           cell.hover <- rownames(hovered)
@@ -3689,7 +3721,7 @@ ISpatialFeaturePlot <- function(
   }
   features <- sort(x = rownames(x = GetAssayData(
     object = object,
-    slot = slot,
+    layer = slot,
     assay = assay
   )))
   feature.label <- 'Feature to visualize'
@@ -3698,7 +3730,7 @@ ISpatialFeaturePlot <- function(
     FUN = function(x) {
       return(!IsMatrixEmpty(x = GetAssayData(
         object = object,
-        slot = slot,
+        layer = slot,
         assay = x
       )))
     },
@@ -3772,7 +3804,7 @@ ISpatialFeaturePlot <- function(
     object = object,
     vars = feature,
     cells = cells.use,
-    slot = slot
+    layer = slot
   )
   plot.data <- cbind(coords, feature.data)
   server <- function(input, output, session) {
@@ -3791,7 +3823,7 @@ ISpatialFeaturePlot <- function(
       feature.use <- input$feature
       features.assay <- sort(x = rownames(x = GetAssayData(
         object = object,
-        slot = slot,
+        layer = slot,
         assay = assay
       )))
       feature.use <- ifelse(
@@ -3822,7 +3854,7 @@ ISpatialFeaturePlot <- function(
             object = object,
             vars = paste0(Key(object = object[[input$assay]]), feature.use),
             cells = cells.use,
-            slot = slot
+            layer = slot
           )
           colnames(x = feature.data) <- feature.use
           plot.env$data <- cbind(coords, feature.data)
@@ -4294,7 +4326,7 @@ SpatialPlot <- function(
 #'
 #' @importFrom methods slot
 #' @importFrom cowplot theme_cowplot
-#' @importFrom ggplot2 ggplot geom_line geom_vline aes_string
+#' @importFrom ggplot2 ggplot geom_line geom_vline
 #'
 #' @export
 #' @concept visualization
@@ -4327,27 +4359,27 @@ BarcodeInflectionsPlot <- function(object) {
   ## Make the plot
   plot <- ggplot(
     data = barcode_distribution,
-    mapping = aes_string(
-      x = 'rank',
-      y = barcode_var,
-      group = group_var,
-      colour = group_var
+    mapping = aes(
+      x = .data[['rank']],
+      y = .data[[barcode_var]],
+      group = .data[[group_var]],
+      colour = .data[[group_var]]
     )
   ) +
     geom_line() +
     geom_vline(
       data = threshold_values,
-      aes_string(xintercept = 'rank'),
+      aes(xintercept = .data[['rank']]),
       linetype = "dashed",
       colour = 'grey60',
       size = 0.5
     ) +
     geom_vline(
       data = inflection_points,
-      mapping = aes_string(
-        xintercept = 'rank',
-        group = group_var,
-        colour = group_var
+      mapping = aes(
+        xintercept = .data[['rank']],
+        group = .data[[group_var]],
+        colour = .data[[group_var]]
       ),
       linetype = "dashed"
     ) +
@@ -4394,7 +4426,7 @@ BarcodeInflectionsPlot <- function(object) {
 #'
 #' @importFrom grDevices colorRampPalette
 #' @importFrom cowplot theme_cowplot
-#' @importFrom ggplot2 ggplot aes_string geom_point scale_size scale_radius
+#' @importFrom ggplot2 ggplot geom_point scale_size scale_radius
 #' theme element_blank labs scale_color_identity scale_color_distiller
 #' scale_color_gradient guides guide_legend guide_colorbar
 #' facet_grid unit
@@ -4565,16 +4597,16 @@ DotPlot <- function(
     splits.use <- unlist(x = lapply(
       X = data.plot$id,
       FUN = function(x)
-      sub(
-        paste0(".*_(",
-               paste(sort(unique(x = splits), decreasing = TRUE),
-                     collapse = '|'
-                     ),")$"),
-        "\\1",
-        x
+        sub(
+          paste0(".*_(",
+                 paste(sort(unique(x = splits), decreasing = TRUE),
+                       collapse = '|'
+                 ),")$"),
+          "\\1",
+          x
         )
-      )
-      )
+    )
+    )
     data.plot$colors <- mapply(
       FUN = function(color, value) {
         return(colorRampPalette(colors = c('grey', color))(20)[value])
@@ -4596,8 +4628,8 @@ DotPlot <- function(
       levels = unique(x = feature.groups)
     )
   }
-  plot <- ggplot(data = data.plot, mapping = aes_string(x = 'features.plot', y = 'id')) +
-    geom_point(mapping = aes_string(size = 'pct.exp', color = color.by)) +
+  plot <- ggplot(data = data.plot, mapping = aes(x = .data[["features.plot"]], y = .data[["id"]])) +
+    geom_point(mapping = aes(size = .data[["pct.exp"]], color = .data[[color.by]])) +
     scale.func(range = c(0, dot.scale), limits = c(scale.min, scale.max)) +
     theme(axis.title.x = element_blank(), axis.title.y = element_blank()) +
     guides(size = guide_legend(title = 'Percent Expressed')) +
@@ -4608,7 +4640,7 @@ DotPlot <- function(
     theme_cowplot()
   if (!is.null(x = feature.groups)) {
     plot <- plot + facet_grid(
-      facets = ~feature.groups,
+      rows = ~feature.groups,
       scales = "free_x",
       space = "free_x",
       switch = "y"
@@ -4644,7 +4676,7 @@ DotPlot <- function(
 #' @return A ggplot object
 #'
 #' @importFrom cowplot theme_cowplot
-#' @importFrom ggplot2 ggplot aes_string geom_point labs element_line
+#' @importFrom ggplot2 ggplot geom_point labs element_line
 #' @export
 #' @concept visualization
 #'
@@ -4663,7 +4695,7 @@ ElbowPlot <- function(object, ndims = 20, reduction = 'pca') {
   }
   stdev <- 'Standard Deviation'
   plot <- ggplot(data = data.frame(dims = 1:ndims, stdev = data.use[1:ndims])) +
-    geom_point(mapping = aes_string(x = 'dims', y = 'stdev')) +
+    geom_point(mapping = aes(x = .data[['dims']], y = .data[['stdev']])) +
     labs(
       x = gsub(
         pattern = '_$',
@@ -4708,7 +4740,7 @@ GroupCorrelationPlot <- function(
   data <- data[complete.cases(data), ]
   colnames(x = data) <- c('grp', 'cor')
   data$grp <- as.character(data$grp)
-  plot <- ggplot(data = data, aes_string(x = "grp", y = "cor", fill = "grp")) +
+  plot <- ggplot(data = data, aes(x = .data[["grp"]], y = .data[["cor"]], fill = .data[["grp"]])) +
     geom_boxplot() +
     theme_cowplot() +
     scale_fill_manual(values = rev(x = brewer_pal(palette = 'YlOrRd')(n = 7))) +
@@ -4757,7 +4789,7 @@ GroupCorrelationPlot <- function(
 #'
 #' @importFrom stats qunif
 #' @importFrom scales hue_pal
-#' @importFrom ggplot2 ggplot aes_string stat_qq labs xlim ylim
+#' @importFrom ggplot2 ggplot stat_qq labs xlim ylim
 #' coord_flip geom_abline guides guide_legend
 #' @importFrom cowplot theme_cowplot
 #'
@@ -4806,7 +4838,7 @@ JackStrawPlot <- function(
   if (length(x = cols) < length(x = dims)) {
     stop("Not enough colors for the number of dims selected")
   }
-  gp <- ggplot(data = data.plot, mapping = aes_string(sample = 'Value', color = 'PC.Score')) +
+  gp <- ggplot(data = data.plot, mapping = aes(sample = .data[['Value']], color = .data[['PC.Score']])) +
     stat_qq(distribution = qunif) +
     labs(x = "Theoretical [runif(1000)]", y = "Empirical") +
     scale_color_manual(values = cols) +
@@ -4843,7 +4875,7 @@ JackStrawPlot <- function(
 #' }
 #' }
 PlotClusterTree <- function(object, direction = "downwards", ...) {
-  if (!PackageCheck('ape', error = FALSE)) {
+  if (isFALSE(x = requireNamespace('ape', quietly = TRUE))) {
     stop(cluster.ape, call. = FALSE)
   }
   if (is.null(x = Tool(object = object, slot = "BuildClusterTree"))) {
@@ -4876,7 +4908,7 @@ PlotClusterTree <- function(object, direction = "downwards", ...) {
 #'
 #' @importFrom patchwork wrap_plots
 #' @importFrom cowplot theme_cowplot
-#' @importFrom ggplot2 ggplot aes_string geom_point labs
+#' @importFrom ggplot2 ggplot geom_point labs
 #' @export
 #' @concept visualization
 #'
@@ -4931,7 +4963,7 @@ VizDimLoadings <- function(
       data.plot$feature <- factor(x = rownames(x = data.plot), levels = rownames(x = data.plot))
       plot <- ggplot(
         data = data.plot,
-        mapping = aes_string(x = colnames(x = data.plot)[1], y = 'feature')
+        mapping = aes(x = .data[[paste0(Key(object = object[[reduction]]), i)]], y = .data[['feature']])
       ) +
         geom_point(col = col) +
         labs(y = NULL) + theme_cowplot()
@@ -4962,7 +4994,7 @@ VizDimLoadings <- function(
 #' @return A ggplot object
 #'
 #' @importFrom png readPNG
-#' @importFrom ggplot2 ggplot_build ggsave ggplot aes_string geom_blank annotation_raster ggtitle
+#' @importFrom ggplot2 ggplot_build ggsave ggplot geom_blank annotation_raster ggtitle
 #'
 #' @export
 #' @concept visualization
@@ -4997,7 +5029,7 @@ AugmentPlot <- function(plot, width = 10, height = 10, dpi = 100) {
   file.remove(tmpfile)
   blank <- ggplot(
     data = plot$data,
-    mapping = aes_string(x = xyparams$x, y = xyparams$y)
+    mapping = aes(x = .data[[xyparams$x]], y = .data[[xyparams$y]])
   ) + geom_blank()
   blank <- blank + plot$theme + ggtitle(label = title)
   blank <- blank + annotation_raster(
@@ -5728,7 +5760,7 @@ Intensity <- function(color) {
 #'
 #' @importFrom stats median na.omit
 #' @importFrom ggrepel geom_text_repel geom_label_repel
-#' @importFrom ggplot2 aes_string geom_text geom_label layer_scales
+#' @importFrom ggplot2 geom_text geom_label layer_scales
 #' @importFrom RANN nn2
 #'
 #' @export
@@ -5835,7 +5867,7 @@ LabelClusters <- function(
     geom.use <- ifelse(test = repel, yes = geom_label_repel, no = geom_label)
     plot <- plot + geom.use(
       data = labels.loc,
-      mapping = aes_string(x = xynames['x'], y = xynames['y'], label = id, fill = id),
+      mapping = aes(x = .data[[xynames['x']]], y = .data[[xynames['y']]], label = .data[[id]], fill = .data[[id]]),
       show.legend = FALSE,
       ...
     ) + scale_fill_manual(values = labels.loc$color[order(labels.loc[, id])])
@@ -5843,7 +5875,7 @@ LabelClusters <- function(
     geom.use <- ifelse(test = repel, yes = geom_text_repel, no = geom_text)
     plot <- plot + geom.use(
       data = labels.loc,
-      mapping = aes_string(x = xynames['x'], y = xynames['y'], label = id),
+      mapping = aes(x = .data[[xynames['x']]], y = .data[[xynames['y']]], label = .data[[id]]),
       show.legend = FALSE,
       ...
     )
@@ -5870,7 +5902,7 @@ LabelClusters <- function(
 #' @return A ggplot object
 #'
 #' @importFrom ggrepel geom_text_repel
-#' @importFrom ggplot2 geom_text aes_string
+#' @importFrom ggplot2 geom_text
 #' @export
 #' @concept visualization
 #'
@@ -5913,7 +5945,7 @@ LabelPoints <- function(
     }
   }
   plot <- plot + geom.use(
-    mapping = aes_string(x = xynames$x, y = xynames$y, label = 'labels'),
+    mapping = aes(x = .data[[xynames$x]], y = .data[[xynames$y]], label = .data[['labels']]),
     data = label.data,
     nudge_x = xnudge,
     nudge_y = ynudge,
@@ -6517,7 +6549,7 @@ BlendExpression <- function(data) {
 #
 #' @importFrom grid unit
 #' @importFrom cowplot theme_cowplot
-#' @importFrom ggplot2 ggplot aes_string scale_fill_manual geom_raster
+#' @importFrom ggplot2 ggplot scale_fill_manual geom_raster
 #' theme scale_y_continuous scale_x_continuous scale_fill_manual
 #
 # @seealso \code{\link{BlendMatrix}}
@@ -6540,7 +6572,7 @@ BlendMap <- function(color.matrix) {
   color.heat$vals <- factor(x = color.heat$vals)
   plot <- ggplot(
     data = color.heat,
-    mapping = aes_string(x = 'rows', y = 'cols', fill = 'vals')
+    mapping = aes(x = .data[['rows']], y = .data[['cols']], fill = .data[['vals']])
   ) +
     geom_raster(show.legend = FALSE) +
     theme(plot.margin = unit(x = rep.int(x = 0, times = 4), units = 'cm')) +
@@ -6767,7 +6799,7 @@ ExIPlot <- function(
       y = cells
     )
   }
-  data <- FetchData(object = object, vars = features, slot = layer, cells = cells)
+  data <- FetchData(object = object, vars = features, layer = layer, cells = cells)
   pt.size <- pt.size %||% AutoPointSize(data = object)
   features <- colnames(x = data)
   data <- data[cells, , drop = FALSE]
@@ -6931,7 +6963,7 @@ FeaturePalettes <- list(
 #' @importFrom Matrix rowMeans rowSums
 #
 GetFeatureGroups <- function(object, assay, min.cells = 5, ngroups = 6) {
-  cm <- GetAssayData(object = object[[assay]], slot = "counts")
+  cm <- GetAssayData(object = object[[assay]], layer = "counts")
   # subset to keep only genes detected in at least min.cells cells
   cm <- cm[rowSums(cm > 0) >= min.cells, ]
   # use the geometric mean of the features to group them
@@ -7524,7 +7556,7 @@ MakeLabels <- function(data) {
 #' @importFrom utils globalVariables
 #' @importFrom stats rnorm dist hclust
 #' @importFrom ggridges geom_density_ridges theme_ridges
-#' @importFrom ggplot2 ggplot aes_string facet_grid theme labs geom_rect
+#' @importFrom ggplot2 ggplot facet_grid theme labs geom_rect
 #' geom_violin geom_jitter ylim position_jitterdodge scale_fill_manual
 #' scale_y_log10 scale_x_log10 scale_y_discrete scale_x_continuous
 #' scale_y_continuous waiver
@@ -7664,7 +7696,7 @@ MultiExIPlot <- function(
   }
   plot <- ggplot(
     data = data,
-    mapping = aes_string(x = x, y = y, fill = fill.by)[c(2, 3, 1)]
+    mapping = aes(x = .data[[x]], y = .data[[y]], fill = .data[[fill.by]])[c(2, 3, 1)]
   ) +
     labs(x = x.label, y = y.label, fill = NULL) +
     theme_cowplot()
@@ -8002,7 +8034,7 @@ globalVariables(names = '..density..', package = 'Seurat')
 #' @importFrom stats cor
 #' @importFrom cowplot theme_cowplot
 #' @importFrom RColorBrewer brewer.pal.info
-#' @importFrom ggplot2 ggplot aes_string geom_point labs scale_color_brewer
+#' @importFrom ggplot2 ggplot geom_point labs scale_color_brewer
 #' scale_color_manual guides stat_density2d aes scale_fill_continuous
 #' @importFrom scattermore geom_scattermore
 #'
@@ -8054,6 +8086,18 @@ SingleCorPlot <- function(
     x = colnames(x = data),
     fixed = TRUE
   )
+  names.plot <- colnames(x = data) <- gsub(
+    pattern = ')',
+    replacement = '.',
+    x = colnames(x = data),
+    fixed = TRUE
+  )
+  names.plot <- colnames(x = data) <- gsub(
+    pattern = '(',
+    replacement = '.',
+    x = colnames(x = data),
+    fixed = TRUE
+  )
   if (ncol(x = data) < 2) {
     msg <- "Too few variables passed"
     if (ncol(x = data) == 1) {
@@ -8091,8 +8135,8 @@ SingleCorPlot <- function(
   }
   plot <- ggplot(
     data = data,
-    mapping = aes_string(x = names.plot[1], y = names.plot[2])
-  ) +
+    mapping = aes(x = .data[[names.plot[1]]], y = .data[[names.plot[2]]])
+    ) +
     labs(
       x = orig.names[1],
       y = orig.names[2],
@@ -8124,7 +8168,7 @@ SingleCorPlot <- function(
       #   data = density
       # ) +
       scale_fill_continuous(low = 'white', high = 'dodgerblue4') +
-      guides(fill = FALSE)
+      guides(fill = "none")
   }
   position <- NULL
   if (jitter) {
@@ -8135,14 +8179,14 @@ SingleCorPlot <- function(
   if (!is.null(x = col.by)) {
     if (raster) {
       plot <- plot + geom_scattermore(
-        mapping = aes_string(color = 'colors'),
+        mapping = aes(color = .data[['colors']]),
         position = position,
         pointsize = pt.size,
         pixels = raster.dpi
       )
     } else {
       plot <- plot + geom_point(
-        mapping = aes_string(color = 'colors'),
+        mapping = aes(color = .data[['colors']]),
         position = position,
         size = pt.size
       )
@@ -8162,13 +8206,13 @@ SingleCorPlot <- function(
     }
     plot <- plot + cols.scale
     if (!is.null(x = rows.highlight)) {
-      plot <- plot + guides(color = FALSE)
+      plot <- plot + guides(color = "none")
     }
   }
   plot <- plot + theme_cowplot() + theme(plot.title = element_text(hjust = 0.5))
   if (!is.null(x = span)) {
     plot <- plot + geom_smooth(
-      mapping = aes_string(x = names.plot[1], y = names.plot[2]),
+      mapping = aes(x = .data[[names.plot[1]]], y = .data[[names.plot[2]]]),
       method = 'loess',
       span = span
     )
@@ -8218,7 +8262,7 @@ SingleCorPlot <- function(
 #'
 #' @importFrom cowplot theme_cowplot
 #' @importFrom RColorBrewer brewer.pal.info
-#' @importFrom ggplot2 ggplot aes_string geom_point labs guides scale_color_brewer
+#' @importFrom ggplot2 ggplot geom_point labs guides scale_color_brewer
 #' scale_color_manual element_rect guide_legend discrete_scale
 #'
 #' @keywords internal
@@ -8343,15 +8387,20 @@ SingleDimPlot <- function(
     alpha.by <- NULL
   }
 
+  # Modify optional parameters to work with tidyeval when NULL and safe naming of color/col.by
+  # see https://github.com/tidyverse/ggplot2/issues/6208
+  # see https://github.com/tidyverse/ggplot2/pull/6215/commits/eaeee6d75cc60118919ca4a06a04cd4549af123c
+  optional  <- list(color = col.by, shape = shape.by, alpha = alpha.by)
+  is_symbol <- lengths(optional) > 0
+  optional  <- c(rlang::data_syms(optional[is_symbol]), optional[!is_symbol])
+
   plot <- ggplot(data = data)
   plot <- if (isTRUE(x = raster)) {
     plot + geom_scattermore(
-      mapping = aes_string(
-        x = dims[1],
-        y = dims[2],
-        color = paste0("`", col.by, "`"),
-        shape = shape.by,
-        alpha = alpha.by
+      mapping = aes(
+        x = .data[[dims[1]]],
+        y = .data[[dims[2]]],
+        !!!optional
       ),
       pointsize = pt.size,
       alpha = alpha,
@@ -8359,12 +8408,10 @@ SingleDimPlot <- function(
     )
   } else {
     plot + geom_point(
-      mapping = aes_string(
-        x = dims[1],
-        y = dims[2],
-        color = paste0("`", col.by, "`"),
-        shape = shape.by,
-        alpha = alpha.by
+      mapping = aes(
+        x = .data[[dims[1]]],
+        y = .data[[dims[2]]],
+        !!!optional
       ),
       size = pt.size,
       alpha = alpha,
@@ -8425,7 +8472,7 @@ SingleDimPlot <- function(
 #' @importFrom stats rnorm
 #' @importFrom utils globalVariables
 #' @importFrom ggridges geom_density_ridges theme_ridges
-#' @importFrom ggplot2 ggplot aes_string theme labs geom_violin geom_jitter
+#' @importFrom ggplot2 ggplot theme labs geom_violin geom_jitter
 #' ylim position_jitterdodge scale_fill_manual scale_y_log10 scale_x_log10
 #' scale_y_discrete scale_x_continuous waiver
 #' @importFrom cowplot theme_cowplot
@@ -8451,11 +8498,11 @@ SingleExIPlot <- function(
   raster.dpi = NULL
 ) {
    if (!is.null(x = raster) && isTRUE(x = raster)){
-    if (!PackageCheck('ggrastr', error = FALSE)) {
+     if (isFALSE(x = requireNamespace('ggrastr', quietly = TRUE))) {
       stop("Please install ggrastr from CRAN to enable rasterization.")
     }
   }
-  if (PackageCheck('ggrastr', error = FALSE)) {
+  if (isTRUE(x = requireNamespace('ggrastr', quietly = TRUE))) {
     # Set rasterization to true if ggrastr is installed and
     # number of points exceeds 100,000
     if ((nrow(x = data) > 1e5) & is.null(x = raster)){
@@ -8518,8 +8565,8 @@ SingleExIPlot <- function(
   switch(
     EXPR = type,
     'violin' = {
-      x <- 'ident'
-      y <- paste0("`", feature, "`")
+      x <- data_sym("ident")
+      y <- data_sym(feature)
       xlab <- 'Identity'
       ylab <- axis.label
       geom <- list(
@@ -8553,8 +8600,8 @@ SingleExIPlot <- function(
       axis.scale <- ylim
     },
     'ridge' = {
-      x <- paste0("`", feature, "`")
-      y <- 'ident'
+      x <- data_sym(feature)
+      y <- data_sym("ident")
       xlab <- axis.label
       ylab <- 'Identity'
       geom <- list(
@@ -8573,7 +8620,7 @@ SingleExIPlot <- function(
   )
   plot <- ggplot(
     data = data,
-    mapping = aes_string(x = x, y = y, fill = fill)[c(2, 3, 1)]
+    mapping = aes(x = !!x, y = !!y, fill = .data[[fill]])[c(2, 3, 1)]
   ) +
     labs(x = xlab, y = ylab, title = feature, fill = NULL) +
     theme_cowplot() +
@@ -8718,7 +8765,7 @@ SingleImageMap <- function(data, order = NULL, title = NULL) {
 #' @importFrom rlang is_na
 #' @importFrom SeuratObject %NA% %!NA%
 #' @importFrom RColorBrewer brewer.pal.info
-#' @importFrom ggplot2 aes_string geom_point geom_polygon ggplot guides
+#' @importFrom ggplot2 geom_point geom_polygon ggplot guides
 #' guide_legend scale_alpha_manual scale_color_manual scale_fill_brewer
 #' scale_fill_manual
 #'
@@ -8795,14 +8842,21 @@ SingleImagePlot <- function(
       n = length(x = levels(x = data$boundary))
     )
   }
+
+  # Normalize the optional column name
+  col_clean <- if (is.null(col.by) || is.na(col.by) || !nzchar(col.by)) NULL else col.by
+  # Build optional aes for fill
+  aes_extra <- if (is.null(col_clean)) list() else list(fill = sym(col_clean))
+
+
   # Assemble plot
   plot <- ggplot(
-    data = data %NA% NULL,
-    mapping = aes_string(
-      x = 'y',
-      y = 'x',
-      alpha = 'boundary',
-      fill = col.by %NA% NULL
+    data = data,
+    mapping = aes(
+      x = .data[["y"]],
+      y = .data[["x"]],
+      alpha = .data[["boundary"]],
+      !!!aes_extra
     )
   )
   if (!is_na(x = data)) {
@@ -8813,7 +8867,7 @@ SingleImagePlot <- function(
           border.size <- 0.3
         }
         geom_polygon(
-          mapping = aes_string(group = 'cell'),
+          mapping = aes(group = .data[['cell']]),
           color = border.color,
           size = border.size
         )
@@ -8874,7 +8928,7 @@ SingleImagePlot <- function(
         )
       }
       plot <- plot + geom_point(
-        mapping = aes_string(fill = NULL, alpha = NULL, color = "molecule"),
+        mapping = aes(fill = NULL, alpha = NULL, color = .data[["molecule"]]),
         data = molecules,
         size = mols.size,
         alpha = mols.alpha,
@@ -8909,13 +8963,13 @@ SingleImagePlot <- function(
 # @return A ggplot-based plot
 #
 #' @importFrom cowplot theme_cowplot
-#' @importFrom ggplot2 ggplot aes_string geom_polygon
+#' @importFrom ggplot2 ggplot geom_polygon
 #
 # @seealso \code{\link[cowplot]{theme_cowplot}}
 #
 SinglePolyPlot <- function(data, group.by, ...) {
-  plot <- ggplot(data = data, mapping = aes_string(x = 'x', y = 'y')) +
-    geom_polygon(mapping = aes_string(fill = group.by, group = 'cell')) +
+  plot <- ggplot(data = data, mapping = aes(x = .data[['x']], y = .data[['y']])) +
+    geom_polygon(mapping = aes(fill = .data[[group.by]], group = .data[['cell']])) +
     coord_fixed() +
     theme_cowplot(...)
   return(plot)
@@ -8935,7 +8989,7 @@ SinglePolyPlot <- function(data, group.by, ...) {
 #'
 #' @return A ggplot2 object
 #
-#' @importFrom ggplot2 ggplot aes_string geom_raster scale_fill_gradient
+#' @importFrom ggplot2 ggplot geom_raster scale_fill_gradient
 #' scale_fill_gradientn theme element_blank labs geom_point guides
 #' guide_legend geom_tile
 #'
@@ -8960,11 +9014,11 @@ SingleRasterMap <- function(
   if (!is.null(x = feature.order)) {
     data$Feature <- factor(x = data$Feature, levels = unique(x = feature.order))
   }
-  if (!is.null(x = cell.order)) {
-    data$Cell <- factor(x = data$Cell, levels = unique(x = cell.order))
-  }
   if (!is.null(x = group.by)) {
     data$Identity <- group.by[data$Cell]
+  }
+  if (!is.null(x = cell.order)) {
+    data$Cell <- factor(x = data$Cell, levels = unique(x = cell.order))
   }
   limits <- limits %||% c(min(data$Expression), max(data$Expression))
   if (length(x = limits) != 2 || !is.numeric(x = limits)) {
@@ -8972,14 +9026,14 @@ SingleRasterMap <- function(
   }
   my_geom <- ifelse(test = raster, yes = geom_raster, no = geom_tile)
   plot <- ggplot(data = data) +
-    my_geom(mapping = aes_string(x = 'Cell', y = 'Feature', fill = 'Expression')) +
+    my_geom(mapping = aes(x = .data[['Cell']], y = .data[['Feature']], fill = .data[['Expression']])) +
     theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
     scale_fill_gradientn(limits = limits, colors = colors, na.value = "white") +
     labs(x = NULL, y = NULL, fill = group.by %iff% 'Expression') +
     WhiteBackground() + NoAxes(keep.text = TRUE)
   if (!is.null(x = group.by)) {
     plot <- plot + geom_point(
-      mapping = aes_string(x = 'Cell', y = 'Feature', color = 'Identity'),
+      mapping = aes(x = .data[['Cell']], y = .data[['Feature']], color = .data[['Identity']]),
       alpha = 0
     ) +
       guides(color = guide_legend(override.aes = list(alpha = 1)))
@@ -9024,7 +9078,7 @@ SingleRasterMap <- function(
 #' @return A ggplot2 object
 #'
 #' @importFrom tibble tibble
-#' @importFrom ggplot2 ggplot aes_string coord_fixed geom_point xlim ylim
+#' @importFrom ggplot2 ggplot coord_fixed geom_point xlim ylim
 #' coord_cartesian labs theme_void theme scale_fill_brewer
 #'
 #' @keywords internal
@@ -9054,8 +9108,7 @@ SingleSpatialPlot <- function(
     warning("Cannot find '", col.by, "' in data, not coloring", call. = FALSE, immediate. = TRUE)
     col.by <- NULL
   }
-  col.by <- col.by %iff% paste0("`", col.by, "`")
-  alpha.by <- alpha.by %iff% paste0("`", alpha.by, "`")
+
   if (!is.null(x = cells.highlight)) {
     highlight.info <- SetHighlight(
       cells.highlight = cells.highlight,
@@ -9070,11 +9123,16 @@ SingleSpatialPlot <- function(
     levels(x = data$ident) <- c(order, setdiff(x = levels(x = data$ident), y = order))
     data <- data[order(data$ident), ]
   }
-  plot <- ggplot(data = data, aes_string(
-    x = colnames(x = data)[2],
-    y = colnames(x = data)[1],
-    fill = col.by,
-    alpha = alpha.by
+
+  col.by.plot <- col.by %iff% data_sym(col.by) # second variable to safely use tidyeval in plotting but not affect subsetting in gsub call later in function
+  col.by <- col.by %iff% paste0("`", col.by, "`")
+  alpha.by <- alpha.by %iff% data_sym(alpha.by)
+
+  plot <- ggplot(data = data, aes(
+    x = .data[[colnames(x = data)[2]]],
+    y = .data[[colnames(x = data)[1]]],
+    fill = !!col.by.plot,
+    alpha = !!alpha.by
   ))
   plot <- switch(
     EXPR = geom,
@@ -9115,11 +9173,11 @@ SingleSpatialPlot <- function(
             )
           )
         ),
-        mapping = aes_string(grob = 'grob'),
+        mapping = aes(grob = .data[['grob']]),
         x = 0.5,
         y = 0.5
       ) +
-        geom_point(mapping = aes_string(color = col.by)) +
+        geom_point(mapping = aes(color = .data[[col.by]])) +
         xlim(0, ncol(x = image)) +
         ylim(nrow(x = image), 0) +
         coord_cartesian(expand = FALSE)
@@ -9138,7 +9196,7 @@ SingleSpatialPlot <- function(
       )
       plot + geom_polygon(
         data = data,
-        mapping = aes_string(fill = col.by, group = 'cell')
+        mapping = aes(fill = .data[[col.by]], group = .data[['cell']])
       ) + coord_fixed() + theme_cowplot()
 
     },

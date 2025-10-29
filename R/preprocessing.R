@@ -220,7 +220,7 @@ HTODemux <- function(
   counts <- GetAssayData(
     object = object,
     assay = assay,
-    slot = 'counts'
+    layer = 'counts'
   )[, colnames(x = object)]
   counts <- as.matrix(x = counts)
   ncenters <- init %||% (nrow(x = data) + 1)
@@ -455,7 +455,7 @@ GetResidual <- function(
       }
     )
   }
-  existing.data <- GetAssayData(object = object, slot = 'scale.data', assay = assay)
+  existing.data <- GetAssayData(object = object, layer = 'scale.data', assay = assay)
   all.features <- union(x = rownames(x = existing.data), y = features)
    new.scale <- matrix(
     data = NA,
@@ -478,7 +478,7 @@ GetResidual <- function(
   object <- SetAssayData(
     object = object,
     assay = assay,
-    slot = "scale.data",
+    layer = "scale.data",
     new.data = new.scale
   )
   if (any(!features.orig %in% rownames(x = new.scale))) {
@@ -660,7 +660,7 @@ Read10X_probe_metadata <- function(
   data.dir,
   filename = 'raw_probe_bc_matrix.h5'
 ) {
-  if (!requireNamespace('hdf5r', quietly = TRUE)) {
+  if (isFALSE(x = requireNamespace('hdf5r', quietly = TRUE))) {
     stop("Please install hdf5r to read HDF5 files")
   }
   file.path = paste0(data.dir,"/", filename)
@@ -868,7 +868,7 @@ MULTIseqDemux <- function(
   assay <- assay %||% DefaultAssay(object = object)
   multi_data_norm <- t(x = GetAssayData(
     object = object,
-    slot = "data",
+    layer = "data",
     assay = assay
   ))
   if (autoThresh) {
@@ -1074,6 +1074,11 @@ Read10X <- function(
     if (ncol(x = feature.names) > 2) {
       data_types <- factor(x = feature.names$V3)
       lvls <- levels(x = data_types)
+      if ("Protein Expression" %in% lvls) {
+        message("Xenium protein expression detected, but no scaling factor",
+                " is supplied with the MEX matrices (vs HDF5). The loaded",
+                " matrix is scaled by a constant from the original values.")
+      }
       if (length(x = lvls) > 1 && length(x = full.data) == 0) {
         message("10X data contains more than one type and is being returned as a list containing matrices of each type.")
       }
@@ -1127,7 +1132,7 @@ Read10X <- function(
 #' @concept preprocessing
 #'
 Read10X_h5 <- function(filename, use.names = TRUE, unique.features = TRUE) {
-  if (!requireNamespace('hdf5r', quietly = TRUE)) {
+  if (isFALSE(x = requireNamespace('hdf5r', quietly = TRUE))) {
     stop("Please install hdf5r to read HDF5 files")
   }
   if (!file.exists(filename)) {
@@ -1157,6 +1162,7 @@ Read10X_h5 <- function(filename, use.names = TRUE, unique.features = TRUE) {
     shp <- infile[[paste0(genome, '/shape')]]
     features <- infile[[paste0(genome, '/', feature_slot)]][]
     barcodes <- infile[[paste0(genome, '/barcodes')]]
+
     sparse.mat <- sparseMatrix(
       i = indices[] + 1,
       p = indptr[],
@@ -1188,6 +1194,15 @@ Read10X_h5 <- function(filename, use.names = TRUE, unique.features = TRUE) {
           simplify = FALSE,
           USE.NAMES = TRUE
         )
+
+        # Apply scaling factor that was used when serializing.
+        if ("Protein Expression" %in% types.unique) {
+          if ("protein_scaling_factor" %in% hdf5r::h5attr_names(infile)) {
+            apply_scaling_factor <- 1.0 / hdf5r::h5attr(infile, "protein_scaling_factor")
+            message("Scaling 'Protein Expression' by ", apply_scaling_factor)
+            sparse.mat[["Protein Expression"]] <- sparse.mat[["Protein Expression"]] * apply_scaling_factor
+          }
+        }
       }
     }
     output[[genome]] <- sparse.mat
@@ -1263,8 +1278,8 @@ Read10X_Image <- function(
       image = image
     )
 
-    # As of v5.1.0 `Radius.VisiumV1` no longer returns the value of the 
-    # `spot.radius` slot and instead calculates the value on the fly, but we 
+    # As of v5.1.0 `Radius.VisiumV1` no longer returns the value of the
+    # `spot.radius` slot and instead calculates the value on the fly, but we
     # can populate the static slot in case it's depended on.
     visium.v1@spot.radius <- Radius(visium.v1)
 
@@ -1316,7 +1331,7 @@ Read10X_Coordinates <- function(filename, filter.matrix) {
   # if the coordinate mappings are in a parquet file
   if (tools::file_ext(filename) == "parquet") {
     # `arrow` must be installed to read parquet files
-    if (!requireNamespace("arrow", quietly = TRUE)) {
+    if (isFALSE(x = requireNamespace('arrow', quietly = TRUE))) {
       stop("Please install arrow to read parquet files")
     }
 
@@ -1437,7 +1452,7 @@ ReadAkoya <- function(
   filter = 'DAPI|Blank|Empty',
   inform.quant = c('mean', 'total', 'min', 'max', 'std')
 ) {
-  if (!requireNamespace("data.table", quietly = TRUE)) {
+  if (isFALSE(x = requireNamespace('data.table', quietly = TRUE))) {
     stop("Please install 'data.table' for this function")
   }
   # Check arguments
@@ -2010,7 +2025,7 @@ ReadNanostring <- function(
   subset.counts.matrix = NULL,
   cell.mols.only = TRUE
 ) {
-  if (!requireNamespace("data.table", quietly = TRUE)) {
+  if (isFALSE(x = requireNamespace('data.table', quietly = TRUE))) {
     stop("Please install 'data.table' for this function")
   }
 
@@ -2746,7 +2761,7 @@ ReadVitessce <- function(
   type = c('segmentations', 'centroids'),
   filter = NA_character_
 ) {
-  if (!requireNamespace('jsonlite', quietly = TRUE)) {
+  if (isFALSE(x = requireNamespace('jsonlite', quietly = TRUE))) {
     stop("Please install 'jsonlite' for this function")
   }
   type <- match.arg(arg = type, several.ok = TRUE)
@@ -2963,7 +2978,7 @@ ReadVizgen <- function(
   z = 3L
 ) {
   # TODO: handle multiple segmentations per z-plane
-  if (!requireNamespace("data.table", quietly = TRUE)) {
+  if (isFALSE(x = requireNamespace('data.table', quietly = TRUE))) {
     stop("Please install 'data.table' for this function")
   }
   # hdf5r is only used for loading polygon boundaries
@@ -3418,10 +3433,10 @@ RunMoransI <- function(data, pos, verbose = TRUE) {
     message("Computing Moran's I")
     mysapply <- pbsapply
   }
-  Rfast2.installed <- PackageCheck("Rfast2", error = FALSE)
-  if (Rfast2.installed) {
+  Rfast2.installed <- requireNamespace('Rfast2', quietly = TRUE)
+  if (isTRUE(x = Rfast2.installed)) {
     MyMoran <- Rfast2::moranI
-  } else if (!PackageCheck('ape', error = FALSE)) {
+  } else if (isFALSE(x = requireNamespace('ape', quietly = TRUE))) {
     stop(
       "'RunMoransI' requires either Rfast2 or ape to be installed",
       call. = FALSE
@@ -3900,7 +3915,7 @@ SCTransform.Assay <- function(
     do.center <- FALSE
   }
 
-  umi <- GetAssayData(object = object, slot = 'counts')
+  umi <- GetAssayData(object = object, layer = 'counts')
   vst.out <- SCTransform(object = umi,
                          cell.attr = cell.attr,
                          reference.SCT.model = reference.SCT.model,
@@ -3939,13 +3954,13 @@ SCTransform.Assay <- function(
   # put log1p transformed counts in data
   assay.out <- SetAssayData(
     object = assay.out,
-    slot = 'data',
-    new.data = log1p(x = GetAssayData(object = assay.out, slot = 'counts'))
+    layer = 'data',
+    new.data = log1p(x = GetAssayData(object = assay.out, layer = 'counts'))
   )
   scale.data <- vst.out$y
   assay.out <- SetAssayData(
     object = assay.out,
-    slot = 'scale.data',
+    layer = 'scale.data',
     new.data = scale.data
   )
   vst.out$y <- NULL
@@ -4240,14 +4255,14 @@ FindVariableFeatures.Assay <- function(
     stop("Both 'mean.cutoff' and 'dispersion.cutoff' must be two numbers")
   }
   if (selection.method == "vst") {
-    data <- GetAssayData(object = object, slot = "counts")
+    data <- GetAssayData(object = object, layer = "counts")
     # if (ncol(x = data) < 1 || nrow(x = data) < 1) {
     if (IsMatrixEmpty(x = data)) {
       warning("selection.method set to 'vst' but count slot is empty; will use data slot instead")
-      data <- GetAssayData(object = object, slot = "data")
+      data <- GetAssayData(object = object, layer = "data")
     }
   } else {
-    data <- GetAssayData(object = object, slot = "data")
+    data <- GetAssayData(object = object, layer = "data")
   }
   hvf.info <- FindVariableFeatures(
     object = data,
@@ -4557,7 +4572,7 @@ FindSpatiallyVariableFeatures.Seurat <- function(
     verbose = verbose,
     ...
   )
-  
+
   object <- LogSeuratCommand(object)
 
   return(object)
@@ -4750,9 +4765,9 @@ NormalizeData.Assay <- function(
 ) {
   object <- SetAssayData(
     object = object,
-    slot = 'data',
+    layer = 'data',
     new.data = NormalizeData(
-      object = GetAssayData(object = object, slot = 'counts'),
+      object = GetAssayData(object = object, layer = 'counts'),
       normalization.method = normalization.method,
       scale.factor = scale.factor,
       verbose = verbose,
@@ -5132,13 +5147,13 @@ ScaleData.Assay <- function(
   slot.use <- ifelse(test = use.umi, yes = 'counts', no = 'data')
   features <- features %||% VariableFeatures(object)
   if (length(x = features) == 0) {
-    features <- rownames(x = GetAssayData(object = object, slot = slot.use))
+    features <- rownames(x = GetAssayData(object = object, layer = slot.use))
   }
   object <- SetAssayData(
     object = object,
-    slot = 'scale.data',
+    layer = 'scale.data',
     new.data = ScaleData(
-      object = GetAssayData(object = object, slot = slot.use),
+      object = GetAssayData(object = object, layer = slot.use),
       features = features,
       vars.to.regress = vars.to.regress,
       latent.data = latent.data,
@@ -5595,10 +5610,10 @@ GetResidualSCTModel <- function(
   umi.assay <- SCTResults(object = object[[assay]], slot = "umi.assay", model = SCTModel)
   model.cells <- Cells(x = slot(object = object[[assay]], name = "SCTModel.list")[[SCTModel]])
   sct.method <-  SCTResults(object = object[[assay]], slot = "arguments", model = SCTModel)$sct.method %||% "default"
-  scale.data.cells <- colnames(x = GetAssayData(object = object, assay = assay, slot = "scale.data"))
+  scale.data.cells <- colnames(x = GetAssayData(object = object, assay = assay, layer= "scale.data"))
   if (length(x = setdiff(x = model.cells, y =  scale.data.cells)) == 0) {
   existing_features <- names(x = which(x = ! apply(
-    X = GetAssayData(object = object, assay = assay, slot = "scale.data")[, model.cells],
+    X = GetAssayData(object = object, assay = assay, layer = "scale.data")[, model.cells],
     MARGIN = 1,
     FUN = anyNA)
   ))
@@ -5624,7 +5639,7 @@ GetResidualSCTModel <- function(
   diff_features <- setdiff(x = features_to_compute, y = model.features)
   intersect_features <- intersect(x = features_to_compute, y = model.features)
   if (length(x = diff_features) == 0) {
-    umi <- GetAssayData(object = object, assay = umi.assay, slot = "counts" )[features_to_compute, model.cells, drop = FALSE]
+    umi <- GetAssayData(object = object, assay = umi.assay, layer = "counts" )[features_to_compute, model.cells, drop = FALSE]
   } else {
     warning(
       "In the SCTModel ", SCTModel, ", the following ", length(x = diff_features),
@@ -5638,7 +5653,7 @@ GetResidualSCTModel <- function(
         dimnames = list(features_to_compute, model.cells)
       ))
     }
-    umi <- GetAssayData(object = object, assay = umi.assay, slot = "counts")[intersect_features, model.cells, drop = FALSE]
+    umi <- GetAssayData(object = object, assay = umi.assay, layer = "counts")[intersect_features, model.cells, drop = FALSE]
   }
   clip.max <- max(clip.range)
   clip.min <- min(clip.range)
@@ -5662,7 +5677,7 @@ GetResidualSCTModel <- function(
   }
   old.features <- setdiff(x = new_features, y = features_to_compute)
   if (length(x = old.features) > 0) {
-    old_residuals <- GetAssayData(object = object[[assay]], slot = "scale.data")[old.features, model.cells, drop = FALSE]
+    old_residuals <- GetAssayData(object = object[[assay]], layer = "scale.data")[old.features, model.cells, drop = FALSE]
     new_residual <- rbind(new_residual, old_residuals)[new_features, ]
   }
   return(new_residual)
