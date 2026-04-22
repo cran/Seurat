@@ -1196,6 +1196,7 @@ as.Seurat.SingleCellExperiment <- function(
   } else {
     assayn <- orig.exp
   }
+  object <- NULL
   for (assay in assayn) {
     if (assay != orig.exp) {
       x <- SingleCellExperiment::swapAltExp(x = x, name = assay, saved = NULL)
@@ -1239,7 +1240,7 @@ as.Seurat.SingleCellExperiment <- function(
     names(x = assays) <- assay
     Key(object = assays[[assay]]) <- paste0(tolower(x = assay), '_')
     # Create the Seurat object
-    if (!exists(x = "object")) {
+    if (is.null(x = object)) {
       object <- CreateSeuratObject(
         counts = assays[[assay]],
         Class = 'Seurat',
@@ -1704,13 +1705,13 @@ GetTissueCoordinates.STARmap <- function(object, qhulls = FALSE, ...) {
 GetTissueCoordinates.VisiumV1 <- function(
   object,
   scale = 'lowres',
-  cols = c('imagerow', 'imagecol'),
+  cols = c('imagecol', 'imagerow'),
   ...
 ) {
   cols <- cols %||% colnames(x = slot(object = object, name = 'coordinates'))
   if (!is.null(x = scale)) {
     coordinates <- slot(
-      object = object, name = 'coordinates')[, c('imagerow', 'imagecol')]
+      object = object, name = 'coordinates')[, c('imagecol', 'imagerow')]
     scale <- match.arg(
       arg = scale, choices = c('spot', 'fiducial', 'hires', 'lowres'))
     scale.use <- ScaleFactors(object = object)[[scale]]
@@ -2258,7 +2259,8 @@ dim.STARmap <- function(x) {
 #' @export
 #'
 dim.VisiumV1 <- function(x) {
-  return(dim(x = GetImage(object = x)$raster))
+  # Use mode='raw' to avoid grob creation
+  return(dim(x = GetImage(object = x, mode = 'raw'))[1:2])
 }
 
 #' @method dim VisiumV2

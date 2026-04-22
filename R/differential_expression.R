@@ -118,54 +118,65 @@ FindAllMarkers <- function(
   }
   genes.de <- list()
   messages <- list()
-  for (i in 1:length(x = idents.all)) {
-    if (verbose) {
-      message("Calculating cluster ", idents.all[i])
-    }
-    genes.de[[i]] <- tryCatch(
-      expr = {
-        FindMarkers(
-          object = object,
-          assay = assay,
-          ident.1 = if (is.null(x = node)) {
-            idents.all[i]
-          } else {
-            tree
-          },
-          ident.2 = if (is.null(x = node)) {
-            NULL
-          } else {
-            idents.all[i]
-          },
-          features = features,
-          logfc.threshold = logfc.threshold,
-          test.use = test.use,
-          slot = slot,
-          min.pct = min.pct,
-          min.diff.pct = min.diff.pct,
-          verbose = verbose,
-          only.pos = only.pos,
-          max.cells.per.ident = max.cells.per.ident,
-          random.seed = random.seed,
-          latent.vars = latent.vars,
-          min.cells.feature = min.cells.feature,
-          min.cells.group = min.cells.group,
-          mean.fxn = mean.fxn,
-          fc.name = fc.name,
-          base = base,
-          densify = densify,
-          ...
-        )
-      },
-      error = function(cond) {
-        return(cond$message)
+  old_opt <- options(Seurat.warn.findmarkers.bpcells.colmajor = TRUE)
+  on.exit(options(old_opt), add = TRUE)
+  withCallingHandlers({
+    for (i in 1:length(x = idents.all)) {
+      if (verbose) {
+        message("Calculating cluster ", idents.all[i])
       }
-    )
-    if (is.character(x = genes.de[[i]])) {
-      messages[[i]] <- genes.de[[i]]
-      genes.de[[i]] <- NULL
+      genes.de[[i]] <- tryCatch(
+        expr = {
+          FindMarkers(
+            object = object,
+            assay = assay,
+            ident.1 = if (is.null(x = node)) {
+              idents.all[i]
+            } else {
+              tree
+            },
+            ident.2 = if (is.null(x = node)) {
+              NULL
+            } else {
+              idents.all[i]
+            },
+            features = features,
+            logfc.threshold = logfc.threshold,
+            test.use = test.use,
+            slot = slot,
+            min.pct = min.pct,
+            min.diff.pct = min.diff.pct,
+            verbose = verbose,
+            only.pos = only.pos,
+            max.cells.per.ident = max.cells.per.ident,
+            random.seed = random.seed,
+            latent.vars = latent.vars,
+            min.cells.feature = min.cells.feature,
+            min.cells.group = min.cells.group,
+            mean.fxn = mean.fxn,
+            fc.name = fc.name,
+            base = base,
+            densify = densify,
+            ...
+          )
+        },
+        error = function(cond) {
+          return(cond$message)
+        }
+      )
+      if (is.character(x = genes.de[[i]])) {
+        messages[[i]] <- genes.de[[i]]
+        genes.de[[i]] <- NULL
+      }
     }
-  }
+  }, warning = function(w) {
+    if (grepl("Column-major order detected", conditionMessage(w))) {
+      msg <- conditionMessage(w)
+      msg <- sub("\\.\\nThis message will be shown once per session\\.$", " to avoid repeated transpositions.", msg)
+      warning(msg, immediate. = TRUE, call. = FALSE)
+      invokeRestart("muffleWarning")
+    }
+  })
   gde.all <- data.frame()
   for (i in 1:length(x = idents.all)) {
     if (is.null(x = unlist(x = genes.de[i]))) {
@@ -369,6 +380,7 @@ FindConservedMarkers <- function(
       ident.1 = ident.use.1,
       ident.2 = ident.use.2,
       verbose = verbose,
+      min.cells.group =   min.cells.group,
       ...
     )
     names(x = marker.test)[i] <- levels.split[i]
@@ -592,6 +604,13 @@ FindMarkers.default <- function(
     if(test.use != "wilcox"){
       stop("Differential expression with BPCells currently only supports the 'wilcox' method.",
            " Please rerun with test.use = 'wilcox'")
+    }
+    if (BPCells::storage_order(object) == "col" && isTRUE(getOption('Seurat.warn.findmarkers.bpcells.colmajor'))) {
+      warning(paste("Column-major order detected; FindMarkers requires row-major order.", 
+              "Consider first running BPCells::transpose_storage_order().",
+              "This message will be shown once per session.", sep = "\n"),
+              immediate. = TRUE, call. = FALSE)
+      options(Seurat.warn.findmarkers.bpcells.colmajor = FALSE)
     }
     data.use <- object[features, c(cells.1, cells.2), drop = FALSE]
     groups <- c(rep("foreground", length(cells.1)), rep("background", length(cells.2)))
@@ -2232,33 +2251,64 @@ PrepSCTFindMarkers <- function(object, assay = "SCT", verbose = TRUE) {
   set_median_umi <- as.list(set_median_umi)
   all_genes <- rownames(x = object[[assay]])
   # correct counts
+  # Recorrect raw UMI counts for one SCT model at a shared target depth
+  # We only recorrect genes whose fitted SCT parameters are all finite
+  # Genes with non finite fitted parameters can produce invalid values during recorrection,
+  # so we exclude them here and add them back later as zero rows to preserve the full feature set
   my.correct_counts <- function(model_name){
-    model_genes <- rownames(x = model_pars_fit[[model_name]])
-      x <- list(
-        model_str = model_str[[model_name]],
-        arguments = arguments[[model_name]],
-        model_pars_fit = as.matrix(x = model_pars_fit[[model_name]]),
-        cell_attr = cell_attr[[model_name]]
-      )
-      cells <- rownames(x = cell_attr[[model_name]])
-      umi <- raw_umi[all_genes, cells]
+    # Retrieve model parameters SCT model per-gene
+    pars <- model_pars_fit[[model_name]]
 
-      umi_corrected <- correct_counts(
-        x = x,
-        umi = umi,
-        verbosity = 0,
-        scale_factor = min_median_umi
-      )
-      missing_features <- setdiff(x = all_genes, y = rownames(x = umi_corrected))
-      corrected_counts.list <- NULL
-      gc(verbose = FALSE)
-      empty <- SparseEmptyMatrix(nrow = length(x = missing_features), ncol = ncol(x = umi_corrected))
-      rownames(x = empty) <- missing_features
-      colnames(x = umi_corrected) <- colnames(x = umi_corrected)
+    # Keep only genes with finite fitted parameters
+    # This is because in split-layer SCT workflows, some sparse genes may have NaN values for
+    # fitted parameters due to low expression levels in some layers
+    valid_genes <- rownames(pars)[
+      is.finite(pars[, "theta"]) &
+      is.finite(pars[, "(Intercept)"]) &
+      is.finite(pars[, "log_umi"])
+    ]
 
-      umi_corrected <- rbind(umi_corrected, empty)[all_genes,]
+    cells <- rownames(cell_attr[[model_name]])
+    # Prepare input list for correct_counts function
+    x <- list(
+      model_str = model_str[[model_name]],
+      arguments = arguments[[model_name]],
+      model_pars_fit = as.matrix(pars[valid_genes, , drop = FALSE]),
+      cell_attr = cell_attr[[model_name]]
+    )
+    # Retrieve raw UMI counts for valid genes and cells
+    umi <- raw_umi[valid_genes, cells, drop = FALSE]
 
-      return(umi_corrected)
+    # Recorrect counts to the common minimum median UMI depth so that counts from different 
+    #SCT models are on the same scale
+    umi_corrected <- correct_counts(
+      x = x,
+      umi = umi,
+      verbosity = 0,
+      scale_factor = min_median_umi
+    )
+
+    # Remove invalid rows to prevent downstream issues with non-finite values in corrected counts
+    # Want to avoid any NaN propagation into SCT assay
+    bad_idx <- which(!is.finite(umi_corrected@x))
+    # correct_counts produces a sparse matrix so we can use the x and i slots for efficiency
+    if (length(bad_idx) > 0) {
+      # For sparse matrices, @x stores nonzero values and @i stores their zero based row indices
+      bad_rows <- unique(umi_corrected@i[bad_idx] + 1) 
+      umi_corrected <- umi_corrected[-bad_rows, , drop = FALSE]
+    }
+    # Add back any genes that were not recorrected for this model (removed above)
+    # This keeps the corrected matrix aligned to the full assay wide gene set
+    missing_features <- setdiff(x = all_genes, y = rownames(x = umi_corrected))
+    gc(verbose = FALSE)
+    empty <- SparseEmptyMatrix(nrow = length(x = missing_features), ncol = ncol(x = umi_corrected))
+    rownames(x = empty) <- missing_features
+    colnames(x = empty) <- colnames(x = umi_corrected)
+
+    # Restore full gene set, original row order
+    umi_corrected <- rbind(umi_corrected, empty)[all_genes,]
+
+    return(umi_corrected)
   }
   corrected_counts.list <- my.lapply(X = levels(x = object[[assay]]),
                                      FUN = my.correct_counts)

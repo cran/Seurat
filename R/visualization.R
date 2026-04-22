@@ -34,16 +34,19 @@ setGeneric(
 #' @param balanced Plot an equal number of genes with both + and - scores.
 #' @param projected Use the full projected dimensional reduction
 #' @param ncol Number of columns to plot
-#' @param fast If true, use \code{image} to generate plots; faster than using ggplot2, but not customizable
+#' @param fast If true, use \code{image} to generate plots; faster than using ggplot2, 
+#' but not customizable and excludes figure legend in output
 #' @param assays A vector of assays to pull data from
-#' @param combine Combine plots into a single \code{\link[patchwork]{patchwork}ed}
-#' ggplot object. If \code{FALSE}, return a list of ggplot objects
+#' @param combine Combine plots into a single \code{\link[patchwork]{patchwork}ed} ggplot object with 
+#' single shared figure legend when \code{fast=FALSE}. If \code{FALSE}, return a list of ggplot objects
+#' @param legend.position When \code{combine=TRUE}, allows legend position to be adjusted
+#' for \code{\link[patchwork]{patchwork}ed} output (default "right"). See \link[ggplot2]{theme}
 #'
 #' @return No return value by default. If using fast = FALSE, will return a
 #' \code{\link[patchwork]{patchwork}ed} ggplot object if combine = TRUE, otherwise
 #' returns a list of ggplot objects
 #'
-#' @importFrom patchwork wrap_plots
+#' @importFrom patchwork wrap_plots plot_layout
 #' @export
 #' @concept visualization
 #'
@@ -54,21 +57,22 @@ setGeneric(
 #' DimHeatmap(object = pbmc_small)
 #'
 DimHeatmap <- function(
-  object,
-  dims = 1,
-  nfeatures = 30,
-  cells = NULL,
-  reduction = 'pca',
-  disp.min = -2.5,
-  disp.max = NULL,
-  balanced = TRUE,
-  projected = FALSE,
-  ncol = NULL,
-  fast = TRUE,
-  raster = TRUE,
-  slot = 'scale.data',
-  assays = NULL,
-  combine = TRUE
+    object,
+    dims = 1,
+    nfeatures = 30,
+    cells = NULL,
+    reduction = 'pca',
+    disp.min = -2.5,
+    disp.max = NULL,
+    balanced = TRUE,
+    projected = FALSE,
+    ncol = NULL,
+    fast = TRUE,
+    raster = TRUE,
+    slot = 'scale.data',
+    assays = NULL,
+    combine = TRUE,
+    legend.position = "right"
 ) {
   ncol <- ncol %||% ifelse(test = length(x = dims) > 2, yes = 3, no = length(x = dims))
   plots <- vector(mode = 'list', length = length(x = dims))
@@ -171,6 +175,9 @@ DimHeatmap <- function(
         cell.order = dim.cells,
         feature.order = dim.features
       )
+      plots[[i]] <- plots[[i]] +
+        ggtitle(paste0(Key(object = object[[reduction]]), dims[i])) +
+        theme(plot.title = element_text(hjust = 0.5, face = "bold"))
     }
   }
   if (fast) {
@@ -178,7 +185,9 @@ DimHeatmap <- function(
     return(invisible(x = NULL))
   }
   if (combine) {
-    plots <- wrap_plots(plots, ncol = ncol, guides = "collect")
+    plots <- wrap_plots(plots, ncol = ncol, guides = "collect") + 
+      plot_layout(guides = "collect") &
+      theme(legend.position = legend.position)
   }
   return(plots)
 }
@@ -1066,6 +1075,7 @@ DimPlot <- function(
 #'     scales that are not comparable between plots
 #' }
 #' @param slot Which slot to pull expression data from?
+#' @param assay Primary assay to pull feature data from
 #' @param blend Scale and blend expression values to visualize coexpression of two features
 #' @param blend.threshold The color cutoff from weak signal to strong signal; ranges from 0 to 1.
 #' @param ncol Number of columns to combine multiple feature plots to, ignored if \code{split.by} is not \code{NULL}
@@ -1123,6 +1133,7 @@ FeaturePlot <- function(
   keep.scale = "feature",
   shape.by = NULL,
   slot = 'data',
+  assay = NULL,
   blend = FALSE,
   blend.threshold = 0.5,
   label = FALSE,
@@ -1223,7 +1234,8 @@ FeaturePlot <- function(
     object = object,
     vars = c(dims, 'ident', features),
     cells = cells,
-    layer = slot
+    layer = slot,
+    assay = assay
   )
   # Check presence of features/dimensions
   if (ncol(x = data) < 4) {
@@ -3274,15 +3286,16 @@ LinkedDimPlot <- function(
   plot.data$selected_ <- FALSE
   Idents(object = object) <- group.by
 
-  # Retrieve coordinates for tissue plot and dim plot seperately
+  # Retrieve coordinates for tissue plot and dim plot separately
   sp_x <- colnames(coords)[1]
   sp_y <- colnames(coords)[2]
   dp_x <- dims[1]
   dp_y <- dims[2]
-  sp_y_min <- min(plot.data[[sp_y]]); sp_y_max <- max(plot.data[[sp_y]])
+  sp_y_min <- min(plot.data[[sp_y]])
+  sp_y_max <- max(plot.data[[sp_y]])
 
   # Add tiny helper function to flip interactive coordinate points
-  flip_y <- function(pt) { pt$y <- sp_y_max - (pt$y - sp_y_min); pt }
+  flip_y <- function(pt) { if (!is.null(pt$y)) { pt$y <- sp_y_max - (pt$y - sp_y_min) }; pt }
 
   # Setup the server
   server <- function(input, output, session) {
@@ -3304,6 +3317,8 @@ LinkedDimPlot <- function(
       handlerExpr = {
         click$pt <- NULL
         click$invert <- FALSE
+        plot.env$data <- plot.data
+        plot.env$alpha.by <- NULL
         session$resetBrush(brushId = 'brush')
       }
     )
@@ -3345,7 +3360,7 @@ LinkedDimPlot <- function(
             plot.data
           }
         } else if (input$brush$outputId == 'dimplot') {
-          brushedPoints(df = plot.data, brush = input$brush, allRows = TRUE)
+          brushedPoints(df = plot.data, brush = input$brush, allRows = TRUE, xvar = dp_x, yvar = dp_y)
         } else if (input$brush$outputId == 'spatialplot') {
           b <- input$brush
           b$ymin <- sp_y_max - (b$ymin - sp_y_min)
@@ -3491,6 +3506,12 @@ LinkedFeaturePlot <- function(
   )
   coords <- GetTissueCoordinates(object = object[[image]], scale = image.scale)
   embeddings <- Embeddings(object = object[[reduction]])[cells.use, dims]
+  sp_x <- colnames(coords)[1]
+  sp_y <- colnames(coords)[2]
+  dp_x <- dims[1]
+  dp_y <- dims[2]
+  # coordinates should be in image space, so need to flip y when setting or displaying info for points
+  flip_y <- function(pt) { if (!is.null(pt)) { pt$y <- max(coords[[sp_y]]) - (pt$y - min(coords[[sp_y]])) }; pt }
   plot.data <- cbind(coords, group.data, embeddings)
   # Setup the server
   server <- function(input, output, session) {
@@ -3544,10 +3565,13 @@ LinkedFeaturePlot <- function(
           coordinfo = if (is.null(x = input[['sphover']])) {
             input$dimhover
           } else {
-            InvertCoordinate(x = input$sphover)
+            flip_y(input$sphover)
           },
           threshold = 10,
-          maxpoints = 1
+          maxpoints = 1,
+          # specify plot-specific axis columns for nearPoints
+          xvar = if (is.null(x = input$sphover)) dp_x else sp_x,
+          yvar = if (is.null(x = input$sphover)) dp_y else sp_y
         ))
         # TODO: Get newlines, extra information, and background color working
         if (length(x = cell.hover) == 1) {
@@ -3616,6 +3640,10 @@ ISpatialDimPlot <- function(
     cells = cells.use
   )
   coords <- GetTissueCoordinates(object = object[[image]], scale = image.scale)
+  sp_x <- colnames(coords)[1]
+  sp_y <- colnames(coords)[2]
+  # coordinates should be in image space, so need to flip y when setting or displaying info for points
+  flip_y <- function(pt) { if (!is.null(pt)) { pt$y <- max(coords[[sp_y]]) - (pt$y - min(coords[[sp_y]])) }; pt }
   scale.factor <- ScaleFactors(object[[image]])[[image.scale]]
   plot.data <- cbind(coords, group.data)
   plot.data$selected_ <- FALSE
@@ -3632,16 +3660,16 @@ ISpatialDimPlot <- function(
     observeEvent(
       eventExpr = input$click,
       handlerExpr = {
+        click$pt <- flip_y(input$click)
         clicked <- nearPoints(
           df = plot.data,
-          coordinfo = InvertCoordinate(x = input$click),
+          coordinfo = click$pt,
           threshold = 10,
           maxpoints = 1,
-          xvar = "y",
-          yvar = "x"
+          xvar = sp_x,
+          yvar = sp_y
         )
         plot.env$data <- if (nrow(x = clicked) == 1) {
-          cell.clicked <- rownames(x = clicked)
           cell.clicked <- rownames(x = clicked)
           group.clicked <- plot.data[cell.clicked, group.by, drop = TRUE]
           idx.group <- which(x = plot.data[[group.by]] == group.clicked)
@@ -3676,11 +3704,11 @@ ISpatialDimPlot <- function(
       expr = {
         hovered <- nearPoints(
           df = plot.data,
-          coordinfo = InvertCoordinate(x = input$hover),
+          coordinfo = flip_y(input$hover),
           threshold = 10,
           maxpoints = 1,
-          xvar = "y",
-          yvar = "x"
+          xvar = sp_x,
+          yvar = sp_y
         )
         if (nrow(hovered) == 1) {
           cell.hover <- rownames(hovered)
@@ -3926,6 +3954,8 @@ ISpatialFeaturePlot <- function(
 #' @param overlay_image Logical; if \code{TRUE}, overlays the tissue image in the background of the plot (default \code{TRUE}).
 #'
 #' @importFrom grDevices png dev.off
+#' @importFrom miniUI miniPage gadgetTitleBar miniContentPanel
+#' @importFrom shiny uiOutput reactiveVal renderUI tags observeEvent stopApp runGadget
 #'
 #' @return A character vector of cell names selected via lasso, which can be used to subset the object.
 #' @export
@@ -3945,14 +3975,18 @@ InteractiveSpatialPlot <- function(
   overlay_image = TRUE
 ) {
   # Check for required packages, stop with clear message if missing
-  if (!requireNamespace("plotly", quietly = TRUE)) {
-    stop("The 'plotly' package must be installed to use InteractiveSpatialPlot().")
-  }
-  if (!requireNamespace("magrittr", quietly = TRUE)) {
-    stop("The 'magrittr' package must be installed to use InteractiveSpatialPlot().")
-  }
-  if (!requireNamespace("base64enc", quietly = TRUE)) {
-    stop("The 'base64enc' package must be installed to use InteractiveSpatialPlot().")
+  required_pkgs <- c("plotly", "magrittr", "base64enc", "shiny")
+  
+  missing_pkgs <- required_pkgs[
+    !vapply(required_pkgs, requireNamespace, quietly = TRUE, FUN.VALUE = logical(1))
+  ]
+  
+  if (length(missing_pkgs) > 0) {
+    stop(
+      "InteractiveSpatialPlot() functionality requires these packages to be installed: ",
+      paste0("'", missing_pkgs, "'", collapse = ", "),
+      call. = FALSE
+    )
   }
 
   # Import magrittr pipe locally
@@ -4102,18 +4136,25 @@ InteractiveSpatialPlot <- function(
   ui <- miniPage(
     gadgetTitleBar("Select a subset of cells"),
     miniContentPanel(
-      plotly::plotlyOutput("plot", height = "100%")
+      plotly::plotlyOutput("plot", height = "100%"),
+      shiny::tags$div(
+        shiny::uiOutput("selection_count"),
+        style = "position:absolute; bottom:8px; right:10px; padding:4px 6px; background:rgba(255,255,255,0.8); font-size:12px; border-radius:3px; pointer-events:none;"
+      )
     )
   )
 
   # Shiny gadget server logic for interactive plot and lasso selection
   server <- function(input, output, session) {
+
+    current_selection <- shiny::reactiveVal(coords$cell)
+
     # Render the interactive plotly scattergl plot
     output$plot <- plotly::renderPlotly({
       plt <- plotly::plot_ly(
         data = coords,
-        x = ~y,          # Plot y on x axis to match Seurat/ggplot conventions
-        y = ~x,          # Plot x on y axis (this handles flipped axes)
+        x = ~x,
+        y = ~y,
         color = ~group,  # Color by group/cluster if available
         key = ~cell,     # Store cell names for selection retrieval
         type = "scattergl", # Use WebGL for performance with large datasets
@@ -4150,25 +4191,39 @@ InteractiveSpatialPlot <- function(
         yaxis = list(
           autorange = "reversed",
           scaleanchor = "x",
-          title = "x",
-          tickvals = x_ticks$tickvals,
-          ticktext = x_ticks$ticktext
-        ),
-        xaxis = list(
-          scaleanchor = "y",
           title = "y",
           tickvals = y_ticks$tickvals,
           ticktext = y_ticks$ticktext
+        ),
+        xaxis = list(
+          scaleanchor = "y",
+          title = "x",
+          tickvals = x_ticks$tickvals,
+          ticktext = x_ticks$ticktext
         )
       )
       plt
     })
 
+    observeEvent(plotly::event_data("plotly_selected"), {
+      selected <- plotly::event_data("plotly_selected")
+
+      if (is.null(selected) || NROW(selected) == 0) {
+        current_selection(NULL)
+      } else {
+        keys <- selected$key
+        keys <- keys[!is.na(keys)]
+        current_selection(keys)
+      }
+    }, ignoreInit = TRUE)
+
+    output$selection_count <- shiny::renderUI({
+      shiny::tags$span(paste0("Selected cells: ", NROW(current_selection())))
+    })
+
     # When user clicks "Done", retrieve lasso selection and close gadget
     observeEvent(input$done, {
-      selected <- plotly::event_data("plotly_selected")
-      selected_cells <- selected$key
-      stopApp(selected_cells)
+      stopApp(current_selection())
     })
 
     # When user clicks "Cancel", exit gadget and return NULL
@@ -4247,6 +4302,8 @@ InteractiveSpatialPlot <- function(
 #' @param shape Control the shape of the spots - same as the ggplot2 parameter.
 #' The default is 21, which plots circles - use 22 to plot squares.
 #' @param stroke Control the width of the border around the spots
+#' @param stroke.alpha Control the opacity of spot borders (when stroke is specified). 
+#' Set to \code{NA} to use the same alpha as the fill.
 #' @param interactive Launch an interactive SpatialDimPlot or SpatialFeaturePlot
 #' session, see \code{\link{ISpatialDimPlot}} or
 #' \code{\link{ISpatialFeaturePlot}} for more details
@@ -4303,6 +4360,7 @@ SpatialPlot <- function(
   alpha = c(1, 1),
   shape = 21,
   stroke = NA,
+  stroke.alpha = NA,
   interactive = FALSE,
   do.identify = FALSE,
   identify.ident = NULL,
@@ -4337,13 +4395,34 @@ SpatialPlot <- function(
   cells <- unique(CellsByImage(object, images = images, unlist = TRUE))
   if (is.null(x = features)) {
     if (interactive) {
-      return(ISpatialDimPlot(
-        object = object,
-        image = images[1],
-        image.scale = image.scale,
-        group.by = group.by,
-        alpha = alpha
-      ))
+      # default alpha is 1 but interactive plotting requires 
+      # a range for proper cluster selection highlighting
+      if (identical(alpha, c(1, 1))) { 
+        alpha <- c(0.1, 1)
+      }
+      tryCatch(
+         expr = {
+           return(ISpatialDimPlot(
+             object = object,
+             image = images[1],
+             image.scale = image.scale,
+             group.by = group.by,
+             alpha = alpha
+           ))
+         },
+         error = function(e) {
+          # error can occur when image and assay don't match
+          # or when the default assay set doesn't have data corresponding to the default ident etc.
+          if (grepl("arguments imply differing number of rows", conditionMessage(e))) {
+            stop(
+              "Cells were removed due to missing data; check if the specified image and assay are correct.\n",
+              call. = FALSE
+            )
+          } else {
+            stop(e)
+          }
+         }
+      )
     }
     group.by <- group.by %||% 'ident'
     object[['ident']] <- Idents(object = object)
@@ -4483,27 +4562,30 @@ SpatialPlot <- function(
     image.idx <- ifelse(test = facet.highlight, yes = 1, no = i)
     image.use <- object[[images[[image.idx]]]]
 
-    is_visium <- inherits(image.use, "VisiumV1") || inherits(image.use, "VisiumV2")
+    is_visium_v2 <- inherits(image.use, "VisiumV2")
     old_axis_orientation <- (!.hasSlot(image.use, "coords_x_orientation")) || (.hasSlot(image.use, "coords_x_orientation") && (slot(image.use, "coords_x_orientation") != 'horizontal'))
-    if (is_visium && old_axis_orientation) {
+    
+    if (is_visium_v2 && old_axis_orientation) {
       stop(
         "Please run `UpdateSeuratObject` on your Seurat object first to ensure that data aligns to the image ", images[[image.idx]], " when plotting.",
         call. = TRUE
       )
     }
 
-    coordinates <- GetTissueCoordinates(
-      object = image.use,
-      scale = image.scale
-    )
-    # if the rownames do not match the cell ids, then dataframe is not created properly
-    rownames(coordinates) <- coordinates$cell
+    # When plotting segmentations, set the default boundary (temporarily) to segmentations
+    if (plot_segmentations == TRUE && inherits(image.use, "VisiumV2") && 
+        "segmentations" %in% names(image.use)) {
+      db <- DefaultBoundary(image.use)
+      on.exit(DefaultBoundary(image.use) <- db, add = TRUE) # Reset on exit
+      DefaultBoundary(image.use) <- "segmentations"
+    }
+    coordinates <- GetTissueCoordinates(object = image.use, scale = image.scale)
     highlight.use <- if (facet.highlight) {
       cells.highlight[i]
     } else {
       cells.highlight
     }
-    for (j in 1:length(x = features)) {
+    for (j in seq_along(features)) {
       cols.unset <- is.factor(x = data[, features[j]]) && is.null(x = cols)
       if (cols.unset) {
         cols <- hue_pal()(n = length(x = levels(x = data[, features[j]])))
@@ -4515,16 +4597,21 @@ SpatialPlot <- function(
         max.feature.value <- max(data[, features[j]])
       }
 
-      # Check if object is of type Visium and contains segmentations (attached via Load10X_Spatial)
-      has_visium_segm_data <- (inherits(image.use, "VisiumV2") &&
-                      !is.null(image.use@boundaries$segmentations) &&
-                      "sf.data" %in% slotNames(image.use@boundaries$segmentations))
+      # Check if object is of type Visium and contains segmentations
+      has_visium_segm_data <- inherits(image.use, "VisiumV2") &&
+                              !is.null(image.use@boundaries$segmentations) &&
+                              "sf.data" %in% slotNames(image.use@boundaries$segmentations)
+
+      # GetTissueCoordinates will not always return a "cell" column (e.g., Visium V1)
+      if (!("cell" %in% colnames(x = coordinates))) {
+        coordinates$cell <- rownames(x = coordinates)
+      }
+
+      idx <- match(coordinates$cell, rownames(x = data))
+      plot.data <- cbind(coordinates, data[idx, features[j], drop = FALSE])
 
       plot <- SingleSpatialPlot(
-        data = cbind(
-          coordinates,
-          data[rownames(x = coordinates), features[j], drop = FALSE]
-        ),
+        data = plot.data,
         image = image.use,
         image.scale = image.scale,
         image.alpha = image.alpha,
@@ -4542,7 +4629,7 @@ SpatialPlot <- function(
         },
         geom = if (inherits(x = image.use, what = "STARmap")) {
           "poly_starmap"
-        } else if (has_visium_segm_data) {
+        } else if (has_visium_segm_data && plot_segmentations) {
           "poly"
         } else {
           "spatial"
@@ -4552,8 +4639,8 @@ SpatialPlot <- function(
         pt.size.factor = pt.size.factor,
         shape = shape,
         stroke = stroke,
-        crop = crop,
-        plot_segmentations = plot_segmentations
+        stroke.alpha = stroke.alpha,
+        crop = crop
       )
       if (is.null(x = group.by)) {
         plot <- plot +
@@ -4574,8 +4661,6 @@ SpatialPlot <- function(
           ),
           geom = if (inherits(x = image.use, what = "STARmap") || (has_visium_segm_data && plot_segmentations)) {
             'GeomPolygon'
-          } else if (has_visium_segm_data && !plot_segmentations) {
-            'GeomPoint'
           } else {
             'GeomSpatial'
           },
@@ -4983,49 +5068,72 @@ DotPlot <- function(
 
 #' Quickly Pick Relevant Dimensions
 #'
-#' Plots the standard deviations (or approximate singular values if running PCAFast)
-#' of the principle components for easy identification of an elbow in the graph.
-#' This elbow often corresponds well with the significant dims and is much faster to run than
-#' Jackstraw
+#' Plots per-component standard deviations (or approximate singular values if running PCAFast),
+#' percent variance explained per principal component, or cumulative percent variance explained,
+#' to help pick an elbow in the graph. This elbow often corresponds well with significant
+#' dimensions and is much faster to run than Jackstraw.
 #'
 #' @param object Seurat object
-#' @param ndims Number of dimensions to plot standard deviation for
-#' @param reduction Reduction technique to plot standard deviation for
+#' @param ndims Number of dimensions to plot (positive integer; capped by stored components)
+#' @param reduction Reduction technique to plot (default is 'pca')
+#' @param plot_type One of \code{"stdev"} (default), \code{"variance"} (per-PC \% variance), or
+#'   \code{"cumulative_variance"} (running sum of those percentages; equals 100\% at the last
+#'   stored PC when \code{ndims} spans all of them)
 #'
 #' @return A ggplot object
 #'
 #' @importFrom cowplot theme_cowplot
-#' @importFrom ggplot2 ggplot geom_point labs element_line
+#' @importFrom ggplot2 ggplot geom_point labs aes
 #' @export
 #' @concept visualization
 #'
 #' @examples
 #' data("pbmc_small")
 #' ElbowPlot(object = pbmc_small)
+#' ElbowPlot(object = pbmc_small, plot_type = "variance")
+#' ElbowPlot(object = pbmc_small, plot_type = "cumulative_variance")
 #'
-ElbowPlot <- function(object, ndims = 20, reduction = 'pca') {
+ElbowPlot <- function(object, ndims = 20, reduction = 'pca', plot_type = c("stdev", "variance", "cumulative_variance")) {
+  plot_type <- match.arg(plot_type)
+  if (!is.numeric(ndims) || length(ndims) != 1L || !is.finite(ndims) || ndims < 1 || ndims != as.integer(ndims)) {
+    stop("'ndims' must be a single positive integer", call. = FALSE)
+  }
+  ndims <- as.integer(ndims)
   data.use <- Stdev(object = object, reduction = reduction)
   if (length(x = data.use) == 0) {
     stop(paste("No standard deviation info stored for", reduction))
   }
+  if (anyNA(data.use)) {
+    stop("Standard deviations contain NA for reduction ", reduction, call. = FALSE)
+  }
   if (ndims > length(x = data.use)) {
-    warning("The object only has information for ", length(x = data.use), " reductions")
+    warning("The object only has information for ", length(x = data.use), " dimensions")
     ndims <- length(x = data.use)
   }
-  stdev <- 'Standard Deviation'
-  plot <- ggplot(data = data.frame(dims = 1:ndims, stdev = data.use[1:ndims])) +
-    geom_point(mapping = aes(x = .data[['dims']], y = .data[['stdev']])) +
-    labs(
-      x = gsub(
-        pattern = '_$',
-        replacement = '',
-        x = Key(object = object[[reduction]])
-      ),
-      y = stdev
-    ) +
+  if (plot_type == "stdev") {
+    y_label <- "Standard Deviation"
+    y_data <- data.use[1:ndims]
+  } else {
+    den <- sum(data.use^2)
+    if (!is.finite(den) || den == 0) {
+      stop("Cannot compute variance explained: sum of squared standard deviations is not positive for reduction ", reduction, call. = FALSE)
+    }
+    pct <- data.use^2 / den * 100
+    if (plot_type == "variance") {
+      y_label <- "Percentage of Variance Explained"
+      y_data <- pct[1:ndims]
+    } else {
+      y_label <- "Cumulative % Variance Explained"
+      y_data <- cumsum(pct)[1:ndims]
+    }
+  }
+  plot <- ggplot(data = data.frame(dims = 1:ndims, y_data = y_data)) +
+    geom_point(mapping = aes(x = .data[["dims"]], y = .data[["y_data"]])) +
+    labs(x = gsub(pattern = '_$', replacement = '', x = Key(object = object[[reduction]])), y = y_label) +
     theme_cowplot()
   return(plot)
 }
+
 
 #' Boxplot of correlation of a variable (e.g. number of UMIs) with expression
 #' data
@@ -7381,7 +7489,8 @@ GeomSpatial <- ggproto(
     point.size.factor = 1.0,
     fill = NA,
     alpha = NA,
-    stroke = NA
+    stroke = NA,
+    stroke.alpha = NA
   ),
   setup_data = function(self, data, params) {
     data <- ggproto_parent(Geom, self)$setup_data(data, params)
@@ -7395,18 +7504,19 @@ GeomSpatial <- ggproto(
     # Locations and sizes are relative to the x- and yscales for the current viewport.
     if (!crop) {
       # needs to be consistent with the origin being in the top-left
-      panel_scales$x$continuous_range <- c(0, img.dim[[1]])
-      panel_scales$y$continuous_range <- c(-img.dim[[2]], 0)
-      panel_scales$y.range <- c(0, img.dim[[1]])
-      panel_scales$x.range <- c(-img.dim[[2]], 0)
+      panel_scales$x$continuous_range <- c(0, img.dim[[2]])
+      panel_scales$y$continuous_range <- c(-img.dim[[1]], 0)
+      panel_scales$x.range <- c(0, img.dim[[2]])
+      panel_scales$y.range <- c(-img.dim[[1]], 0)
     }
     z <- coord$transform(
       data.frame(x = c(0, img.dim[[2]]), y = c(0, img.dim[[1]])),
       panel_scales
     )
+    # Construct viewport for the plot based on img dimensions and plot coords
     wdth <- z$x[2] - z$x[1]
     hgth <- z$y[2] - z$y[1]
-    vp <- viewport(
+    plot_viewport <- viewport(
       x = unit(x = z$x[1], units = "npc"),
       y = unit(x = z$y[1], units = "npc"),
       width = unit(x = wdth, units = "npc"),
@@ -7414,23 +7524,38 @@ GeomSpatial <- ggproto(
       just = c("left", "top")
     )
 
-    spot.size <- Radius(object = image, scale = image.scale)
+    # Calculate spot size relative to the image size to be consistent across different images and scales
+    spot.radius <- Radius(object = image, scale = image.scale)
+    base.point.size <- if (length(spot.radius) == 1L) {
+      unit(spot.radius, "npc")
+    } else {
+      unit(rep_len(1, nrow(data)), "mm")
+    }
+    point.size <- base.point.size * data$point.size.factor
     coords <- coord$transform(data, panel_scales)
 
-    img <- editGrob(grob = GetImage(image), vp = vp)
+    stroke_color <- alpha(
+      "black",
+      ifelse(is.na(coords$stroke.alpha), coords$alpha, coords$stroke.alpha)
+    )
+
     pts <- pointsGrob(
       x = coords$x,
       y = coords$y,
       pch = data$shape,
-      size = unit(spot.size, "npc") * data$point.size.factor,
+      size = point.size,
       gp = gpar(
-        col = alpha(colour = coords$colour, alpha = coords$alpha),
         fill = alpha(colour = coords$fill, alpha = coords$alpha),
-        lwd = coords$stroke)
+        col = stroke_color,
+        lwd = coords$stroke
+      )
     )
-    vp <- viewport()
-    gt <- gTree(vp = vp)
+    canvas_viewport <- viewport()
+    gt <- gTree(vp = canvas_viewport) # empty gTree to add the image and points to
+    # Only draw the image if it has a non-zero alpha value, otherwise just draw the points
     if (image.alpha > 0) {
+      img_grob <- GetImage(image)
+      img <- editGrob(grob = img_grob, vp = plot_viewport)
       if (image.alpha != 1) {
         img$raster = as.raster(
           x = matrix(
@@ -8034,7 +8159,9 @@ MultiExIPlot <- function(
   ) +
     labs(x = x.label, y = y.label, fill = NULL) +
     theme_cowplot()
-  plot <- do.call(what = '+', args = list(plot, geom))
+  for (layer in geom) {
+    plot <- plot + layer
+  }
   if (flip) {
     plot <- plot +
       scale_y_continuous(
@@ -8629,8 +8756,16 @@ SingleDimPlot <- function(
             "\nTo disable this behavior set `raster=FALSE`")
   }
   raster <- raster %||% (nrow(x = data) > 1e5)
+  # IF raster is TRUE and order is specified, points are plotted with ggrastr::geom_point_rast to maintain 
+  # correct ordering of points
+  order_rast <- isTRUE(raster) && (!(isFALSE(x = order) || is.null(x = order)))
+  if (order_rast) {
+    # Check if ggrastr installed correctly and in namespace
+    if (isFALSE(x = requireNamespace('ggrastr', quietly = TRUE))){
+      stop("Please install ggrastr from CRAN to enable ordered rasterization.")
+    }
+  }
   pt.size <- pt.size %||% AutoPointSize(data = data, raster = raster)
-
   if (is.null(x = stroke.size)) {
     stroke.size <- 0.600075815011372
   }
@@ -8727,30 +8862,60 @@ SingleDimPlot <- function(
   optional  <- list(color = col.by, shape = shape.by, alpha = alpha.by)
   is_symbol <- lengths(optional) > 0
   optional  <- c(rlang::data_syms(optional[is_symbol]), optional[!is_symbol])
-
+  # Separate plotting aesthetics based on whether alpha is defined by a scalar or a mapping variable
+  use.alpha <- is.null(x = alpha.by) 
+  
   plot <- ggplot(data = data)
   plot <- if (isTRUE(x = raster)) {
-    plot + geom_scattermore(
-      mapping = aes(
-        x = .data[[dims[1]]],
-        y = .data[[dims[2]]],
-        !!!optional
-      ),
-      pointsize = pt.size,
-      alpha = alpha,
-      pixels = raster.dpi
-    )
+    # Use geom_point_rast when generating rasterized plots with specified order
+    # (although slower, orders points correctly whereas geom_scattermore does not)
+    if (!order_rast) {
+      if (use.alpha) {
+        plot + geom_scattermore(
+          mapping = aes(x = .data[[dims[1]]], y = .data[[dims[2]]], !!!optional),
+          pointsize = pt.size,
+          alpha = alpha,
+          pixels = raster.dpi
+        )
+      } else {
+        plot + geom_scattermore(
+          mapping = aes(x = .data[[dims[1]]], y = .data[[dims[2]]], !!!optional),
+          pointsize = pt.size,
+          pixels = raster.dpi
+        )
+      }
+    } else {
+      rlang::warn(message = "Seurat uses ggrastr::rasterise to maintain point order with rasterization.", 
+                  .frequency = "once",
+                  .frequency_id = "Seurat-ggrastr-rasterise")
+      if (use.alpha) {
+        plot + ggrastr::rasterise(geom_point(
+          mapping = aes(x = .data[[dims[1]]], y = .data[[dims[2]]], !!!optional),
+          size = pt.size,
+          alpha = alpha
+        ))
+      } else {
+        plot + ggrastr::rasterise(geom_point(
+          mapping = aes(x = .data[[dims[1]]], y = .data[[dims[2]]], !!!optional),
+          size = pt.size
+        ))
+      }
+    }
   } else {
-    plot + geom_point(
-      mapping = aes(
-        x = .data[[dims[1]]],
-        y = .data[[dims[2]]],
-        !!!optional
-      ),
-      size = pt.size,
-      alpha = alpha,
-      stroke = stroke.size
-    )
+    if (use.alpha) {
+      plot + geom_point(
+        mapping = aes(x = .data[[dims[1]]], y = .data[[dims[2]]], !!!optional),
+        size = pt.size,
+        alpha = alpha,
+        stroke = stroke.size
+      )
+    } else {
+      plot + geom_point(
+        mapping = aes(x = .data[[dims[1]]], y = .data[[dims[2]]], !!!optional),
+        size = pt.size,
+        stroke = stroke.size
+      )
+    }
   }
   plot <- plot +
     guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
@@ -8959,7 +9124,9 @@ SingleExIPlot <- function(
     labs(x = xlab, y = ylab, title = feature, fill = NULL) +
     theme_cowplot() +
     theme(plot.title = element_text(hjust = 0.5))
-  plot <- do.call(what = '+', args = list(plot, geom))
+  for (layer in geom) {
+    plot <- plot + layer
+  }
   plot <- plot + if (log) {
     log.scale
   } else {
@@ -9394,6 +9561,8 @@ SingleRasterMap <- function(
 #' to show entire background image.
 #' @param pt.size.factor Sets the size of the points relative to spot.radius
 #' @param stroke Control the width of the border around the spots
+#' @param stroke.alpha Control the opacity of spot borders (when stroke is specified). 
+#' Set to \code{NA} to use the same alpha as the fill.
 #' @param shape Control the shape of the spots - same as the ggplot2 parameter.
 #' The default is 21, which plots cirlces - use 22 to plot squares.
 #' @param col.by Mapping variable for the point color
@@ -9408,14 +9577,13 @@ SingleRasterMap <- function(
 #' @param geom Switch between normal spatial geom and geom to enable hover
 #' functionality
 #' @param na.value Color for spots with NA values
-#' @param plot_segmentations Define whether plot should plot centroids or segmentations
 #'
 #' @return A ggplot2 object
 #'
 #' @importFrom tibble tibble
-#' @importFrom ggplot2 ggplot coord_fixed geom_point 
-#' xlim ylim coord_cartesian labs theme_void theme 
-#' scale_fill_brewer scale_y_reverse annotation_custom
+#' @importFrom ggplot2 ggplot coord_fixed geom_point xlim ylim
+#' coord_cartesian labs theme_void theme scale_fill_brewer
+#' scale_y_reverse annotation_custom after_scale
 #'
 #' @keywords internal
 #'
@@ -9432,15 +9600,74 @@ SingleSpatialPlot <- function(
   pt.size.factor = NULL,
   shape = 21,
   stroke = NA,
+  stroke.alpha = NA,
   col.by = NULL,
   alpha.by = NULL,
   cells.highlight = NULL,
   cols.highlight = c('#DE2D26', 'grey50'),
   geom = c('spatial', 'interactive', 'poly', 'poly_starmap'),
-  na.value = 'grey50',
-  plot_segmentations = FALSE
+  na.value = 'grey50'
 ) {
   geom <- match.arg(arg = geom)
+  image_dim <- dim(image)
+  image.height <- image_dim[1]
+  image.width <- image_dim[2]
+  ggplot_version_4 <- packageVersion("ggplot2") >= "4.0.0"
+
+  # Helper to set coord limits based on image dimensions
+  coord_limits <- function() {
+    xlim <- if (!crop) c(0, image.width) else NULL
+    ylim <- NULL
+    if (!crop) {
+      if (!ggplot_version_4) {
+        message("Changing coordinate limits to work with ggplot2 < 4.0.0.")
+        ylim <- c(image.height, 0)
+      } else {
+        ylim <- c(0, image.height)
+      }
+    }
+    list(x = xlim, y = ylim)
+  }
+
+  # Helper to create custom annotation layer for the background image 
+  build_image_annotation <- function() {
+    if (image.alpha == 0) {
+      return(NULL)
+    }
+    image_to_plot <- GetImage(object = image, mode = "raw")
+    if (image.alpha < 1) {
+      rgba_image <- array(data = NA, dim = c(image_dim[1:2], 4))
+      rgba_image[, , 1:3] <- image_to_plot
+      rgba_image[, , 4] <- image.alpha
+      image_to_plot <- rgba_image
+    }
+    image.grob <- rasterGrob(
+      image_to_plot,
+      width = unit(1, "npc"),
+      height = unit(1, "npc"),
+      interpolate = FALSE
+    )
+    if (!ggplot_version_4) {
+      message("Changing image annotation limits to work with ggplot2 < 4.0.0.")
+      return(annotation_custom(
+        grob = image.grob,
+        xmin = 0,
+        xmax = image.width,
+        ymin = -image.height,
+        ymax = 0
+      ))
+    }
+    return(annotation_custom(
+      grob = image.grob,
+      xmin = 0,
+      xmax = image.width,
+      ymin = 0,
+      ymax = image.height
+    ))
+  }
+
+  limits <- coord_limits()
+
   if (!is.null(col.by) && !col.by %in% colnames(data)) {
     warning("Cannot find '", col.by, "' in data, not coloring", call. = FALSE, immediate. = TRUE)
     col.by <- NULL
@@ -9460,25 +9687,28 @@ SingleSpatialPlot <- function(
     levels(x = data$ident) <- c(order, setdiff(x = levels(x = data$ident), y = order))
     data <- data[order(data$ident), ]
   }
-  col.by.plot <- col.by %iff% data_sym(col.by) #had to create second variable to safely use tidyeval in plotting but not effect subsetting in gsub call later in function
-  col.by <- col.by %iff% paste0("`", col.by, "`")
 
-  # Store unquoted col.by name for easier access
-  col.by.clean <- gsub("`", "", col.by)
+  col.by.plot <- col.by %iff% data_sym(col.by) # for use in aes() if not NULL
+  col.by <- col.by %iff% paste0("`", col.by, "`") # quote + wrap in backticks for safe direct use within [[ ]]
+  col.by.clean <- gsub("`", "", col.by) # quote
 
   alpha.by <- alpha.by %iff% data_sym(alpha.by)
 
+  xname <- colnames(x = data)[1]
+  yname <- colnames(x = data)[2]
+
   plot <- ggplot(data = data, aes(
-    x = .data[[colnames(x = data)[1]]],
-    y = .data[[colnames(x = data)[2]]],
+    x = .data[[xname]],
+    y = .data[[yname]],
     fill = !!col.by.plot,
     alpha = !!alpha.by
   ))
+
   plot <- switch(
     EXPR = geom,
     'spatial' = {
-      if (is.null(x = pt.alpha)) {
-        plot <- plot + geom_spatial(
+      geom_spatial_layer <- if (is.null(pt.alpha)) {
+        geom_spatial(
           point.size.factor = pt.size.factor,
           data = data,
           image = image,
@@ -9487,9 +9717,10 @@ SingleSpatialPlot <- function(
           crop = crop,
           shape = shape,
           stroke = stroke,
+          stroke.alpha = stroke.alpha
         )
       } else {
-        plot <- plot + geom_spatial(
+        geom_spatial(
           point.size.factor = pt.size.factor,
           data = data,
           image = image,
@@ -9498,10 +9729,14 @@ SingleSpatialPlot <- function(
           crop = crop,
           shape = shape,
           stroke = stroke,
+          stroke.alpha = stroke.alpha,
           alpha = pt.alpha
         )
       }
-      plot + coord_fixed() + scale_y_reverse()
+      plot + geom_spatial_layer +
+        coord_fixed(xlim = limits$x, ylim = limits$y) + 
+        scale_y_reverse() +
+        theme_void()
     },
     'interactive' = {
       plot + geom_spatial_interactive(
@@ -9523,124 +9758,37 @@ SingleSpatialPlot <- function(
         coord_cartesian(expand = FALSE)
     },
     'poly' = {
-
-      image_to_plot <- image@image
-
-      # Apply image transparency
-      if (image.alpha < 1) {
-          # Convert image to RGBA by adding alpha channel
-          rgba_image <- array(data = NA, dim = c(dim(image_to_plot)[1:2], 4))
-          rgba_image[,,1:3] <- image_to_plot
-          rgba_image[,,4] <- image.alpha
-          image_to_plot <- rgba_image
-      }
-      
-      # Validate image
-      image.grob <- rasterGrob(
-        image_to_plot,
-        width = unit(1, "npc"),
-        height = unit(1, "npc"),
-        interpolate = FALSE
-      )
-
-      # Retrieve scale factor from specified image scale ("lowres"/"hires")
-      scale.factor <- ScaleFactors(image)[[image.scale]]
-      if (is.null(scale.factor)) stop("Scale factor for '", image.scale, "' not found")
-      
-      # Retrieve image dimensions for later use
-      image.height <- dim(image@image)[1]
-      image.width <- dim(image@image)[2]
-      
-      # Extract and scale segmentation data
-      segm_data <- image@boundaries$segmentations@sf.data
-      segm_data$x <- segm_data$x * scale.factor
-      segm_data$y <- segm_data$y * scale.factor
-
-      # Merge segmentation data with expression data and centroid coordinates
-      plot_data <- merge(segm_data,
-                        data,
-                        by = "cell",
-                        suffixes = c("", ".centroid"),
-                        sort = FALSE)
-
-      if (packageVersion("ggplot2") < "4.0.0") {
-        message("Changing image annotation limits to work with ggplot2 < 4.0.0.")
-        image_annotation_layer <- annotation_custom(
-                              grob = image.grob,
-                              xmin = 0,
-                              xmax = image.width,
-                              ymin = -image.height,
-                              ymax = 0)
-      } else {
-        image_annotation_layer <- annotation_custom(
-                              grob = image.grob,
-                              xmin = 0,
-                              xmax = image.width,
-                              ymin = 0,
-                              ymax = image.height)
-      }
-
-      # Create appropriate geom layer based on plot_segmentations
-      if (!plot_segmentations) {
-        #If plot_segmentations FALSE, then plot just the polygon centroids 
-        if (is.null(pt.alpha)) {
-          #If pt.alpha not provided, then alpha parameter is derived from group/cluster data
-          #Use alpha.by instead of pt.alpha
-          geom_point_layer <- geom_point(
-            data = plot_data,
-            shape = 21, 
-            stroke = stroke,
-            size = pt.size.factor,
-            aes(x = .data[['x.centroid']], y = .data[['y.centroid']], fill = !!col.by.plot, alpha = !!alpha.by)
-          )
-        } else {
-          geom_point_layer <- geom_point(
-            data = plot_data,
-            shape = 21,
-            stroke = stroke,
-            size = pt.size.factor,
-            aes(x = .data[['x.centroid']], y = .data[['y.centroid']], fill = !!col.by.plot),
-            alpha = pt.alpha
-          )
-        }
-        ggplot() +
-            image_annotation_layer +
-            geom_point_layer +
-            scale_y_reverse() + 
-            xlab("x") +
-            ylab("y") +
-            coord_fixed() +
-            theme_void()
-      } else {
-        
-        if (is.null(pt.alpha)) {
-          # If pt.alpha is not provided, then alpha is derived from group/cluster data
-          # Use alpha.by instead of pt.alpha
-          geom_polygon_layer <- geom_polygon(
-            data = plot_data,
-            aes(x = .data[['x']], y = .data[['y']], fill = !!col.by.plot, alpha = !!alpha.by, group = .data[['cell']]),
-            color = "black",
+      # define aesthetics for geom_polygon layer based on if pt.alpha (SDP) or alpha.by (SFP) is set
+      geom_poly_layer <- if (is.null(pt.alpha)) {
+        if (is.na(x = stroke.alpha)) {
+          geom_polygon(
+            data = data,
+            aes(x = .data[[xname]], y = .data[[yname]], fill = !!col.by.plot, alpha = !!alpha.by, group = .data[['cell']], color = after_scale(alpha("black", alpha))),
             linewidth = stroke
           )
         } else {
-          # If pt.alpha is indeed provided, then use that to define alpha
-          geom_polygon_layer <- geom_polygon(
-            data = plot_data,
-            aes(x = .data[['x']], y = .data[['y']], fill = !!col.by.plot, group = .data[['cell']]),
-            alpha = pt.alpha,
-            color = "black",
+          geom_polygon(
+            data = data,
+            aes(x = .data[[xname]], y = .data[[yname]], fill = !!col.by.plot, alpha = !!alpha.by, group = .data[['cell']]),
+            color = alpha("black", stroke.alpha),
             linewidth = stroke
           )
         }
-        ggplot() +
-            image_annotation_layer +
-            geom_polygon_layer +
-            scale_y_reverse() + 
-            xlab("x") +
-            ylab("y") +
-            coord_fixed() +
-            theme_void()
+      } else {
+        geom_polygon(
+          data = data,
+          aes(x = .data[[xname]], y = .data[[yname]], fill = !!col.by.plot, group = .data[['cell']]),
+          alpha = pt.alpha,
+          color = if (is.na(x = stroke.alpha)) alpha("black", pt.alpha) else alpha("black", stroke.alpha),
+          linewidth = stroke
+        )
       }
+      ggplot() +
+        build_image_annotation() +
+        geom_poly_layer +
+        scale_y_reverse() +
+        coord_fixed(xlim = limits$x, ylim = limits$y) +
+        theme_void()
     },
     'poly_starmap' = {
       data$cell <- rownames(x = data)
@@ -9661,22 +9809,19 @@ SingleSpatialPlot <- function(
     },
     stop("Unknown geom, choose from 'spatial' or 'interactive'", call. = FALSE)
   )
+  scale.aesthetic <- if (geom == "interactive") "color" else "fill"
   if (!is.null(x = cells.highlight)) {
-    plot <- plot + scale_fill_manual(values = cols.highlight)
+    plot <- plot + if (scale.aesthetic == "fill") {
+      scale_fill_manual(values = cols.highlight)
+    } else {
+      scale_color_manual(values = cols.highlight)
+    }
   }
   if (!is.null(x = cols) && is.null(x = cells.highlight)) {
-    if (length(x = cols) == 1 && (is.numeric(x = cols) || cols %in% rownames(x = brewer.pal.info))) {
-      scale <- scale_fill_brewer(palette = cols, na.value = na.value)
-    } else if (length(x = cols) == 1 && (cols %in% c('alphabet', 'alphabet2', 'glasbey', 'polychrome', 'stepped'))) {
-      colors <- DiscretePalette(length(unique(data[[col.by]])), palette = cols)
-      scale <- scale_fill_manual(values = colors, na.value = na.value)
-    } else {
+    if (length(x = col.by.clean) == 1L && nzchar(x = col.by.clean)) {
       data[[col.by.clean]] <- as.character(data[[col.by.clean]])
-      vals <- unique(as.character(data[[col.by.clean]]))
-      cols <- cols[names(cols) %in% vals]
-      scale <- scale_fill_manual(values = cols, na.value = na.value)
+      plot <- plot + .BuildDiscreteScale(data = data, cols = cols, col.by = col.by.clean, na.value = na.value, aesthetic = scale.aesthetic)
     }
-    plot <- plot + scale
   }
   plot <- plot + NoAxes() + theme(panel.background = element_blank())
   return(plot)
