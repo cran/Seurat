@@ -1,5 +1,5 @@
 Package: Seurat
-Version: 5.5.0
+Version: 5.5.1
 Title: Tools for Single Cell Genomics
 Description: A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) <doi:10.1038/nbt.3192>, Macosko E, Basu A, Satija R, et al (2015) <doi:10.1016/j.cell.2015.05.002>, Stuart T, Butler A, et al (2019) <doi:10.1016/j.cell.2019.05.031>, and Hao, Hao, et al (2020) <doi:10.1101/2020.10.12.335331> for more details.
 Authors@R: c(
@@ -65,7 +65,7 @@ Collate: 'RcppExports.R' 'reexports.R' 'generics.R' 'clustering.R'
         'objects.R' 'preprocessing.R' 'preprocessing5.R' 'roxygen.R'
         'sketching.R' 'tree.R' 'utilities.R'
 NeedsCompilation: yes
-Packaged: 2026-04-21 22:46:06 UTC; root
+Packaged: 2026-06-25 14:09:59 UTC; root
 Author: Andrew Butler [ctb] (ORCID: <https://orcid.org/0000-0003-3608-0463>),
   Saket Choudhary [ctb] (ORCID: <https://orcid.org/0000-0001-5202-7633>),
   David Collins [ctb] (ORCID: <https://orcid.org/0000-0001-9243-7821>),
@@ -99,4 +99,4 @@ Author: Andrew Butler [ctb] (ORCID: <https://orcid.org/0000-0003-3608-0463>),
   Satija Lab and Collaborators [fnd]
 Maintainer: Rahul Satija <seurat@nygenome.org>
 Repository: CRAN
-Date/Publication: 2026-04-22 08:10:02 UTC
+Date/Publication: 2026-06-26 09:10:02 UTC
