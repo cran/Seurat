@@ -1,5 +1,5 @@
 Package: Seurat
-Version: 5.5.1
+Version: 5.6.0
 Title: Tools for Single Cell Genomics
 Description: A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) <doi:10.1038/nbt.3192>, Macosko E, Basu A, Satija R, et al (2015) <doi:10.1016/j.cell.2015.05.002>, Stuart T, Butler A, et al (2019) <doi:10.1016/j.cell.2019.05.031>, and Hao, Hao, et al (2020) <doi:10.1101/2020.10.12.335331> for more details.
 Authors@R: c(
@@ -45,7 +45,7 @@ Imports: cluster, cowplot, fastDummies, fitdistrplus, future,
         RcppAnnoy (>= 0.0.18), RcppHNSW, reticulate, rlang, ROCR,
         RSpectra, Rtsne, scales, scattermore (>= 1.2), sctransform (>=
         0.4.1), shiny, spatstat.explore, spatstat.geom, stats, tibble,
-        tools, utils, uwot (>= 0.1.10)
+        tools, utils, uwot (>= 0.2.4)
 Suggests: ape, arrow, base64enc, Biobase, BiocGenerics, BPCells,
         data.table, DESeq2, DelayedArray, enrichR, GenomicRanges,
         GenomeInfoDb, glmGamPoi, ggrastr, harmony, hdf5r, IRanges,
@@ -53,7 +53,9 @@ Suggests: ape, arrow, base64enc, Biobase, BiocGenerics, BPCells,
         presto, rsvd, R.utils, Rfast2, rtracklayer, S4Vectors, sf (>=
         1.0.0), sp, SingleCellExperiment, SummarizedExperiment,
         testthat, VGAM
-LinkingTo: Rcpp (>= 0.11.0), RcppEigen, RcppProgress
+LinkingTo: Rcpp (>= 0.11.0), RcppAnnoy (>= 0.0.18), RcppEigen,
+        RcppProgress, RcppThread, RSpectra
+SystemRequirements: GNU make
 BuildManual: true
 Encoding: UTF-8
 LazyData: true
@@ -65,7 +67,7 @@ Collate: 'RcppExports.R' 'reexports.R' 'generics.R' 'clustering.R'
         'objects.R' 'preprocessing.R' 'preprocessing5.R' 'roxygen.R'
         'sketching.R' 'tree.R' 'utilities.R'
 NeedsCompilation: yes
-Packaged: 2026-06-25 14:09:59 UTC; root
+Packaged: 2026-10-02 23:24:00 UTC; root
 Author: Andrew Butler [ctb] (ORCID: <https://orcid.org/0000-0003-3608-0463>),
   Saket Choudhary [ctb] (ORCID: <https://orcid.org/0000-0001-5202-7633>),
   David Collins [ctb] (ORCID: <https://orcid.org/0000-0001-9243-7821>),
@@ -99,4 +101,4 @@ Author: Andrew Butler [ctb] (ORCID: <https://orcid.org/0000-0003-3608-0463>),
   Satija Lab and Collaborators [fnd]
 Maintainer: Rahul Satija <seurat@nygenome.org>
 Repository: CRAN
-Date/Publication: 2026-06-26 09:10:02 UTC
+Date/Publication: 2026-10-03 13:10:02 UTC
