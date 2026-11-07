@@ -6,7 +6,7 @@
 \alias{Seurat-package}
 \title{Seurat: Tools for Single Cell Genomics}
 \description{
-A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) \doi{10.1038/nbt.3192}, Macosko E, Basu A, Satija R, et al (2015) \doi{10.1016/j.cell.2015.05.002}, Stuart T, Butler A, et al (2019) \doi{10.1016/j.cell.2019.05.031}, and Hao, Hao, et al (2020) \doi{10.1101/2020.10.12.335331} for more details.
+A toolkit for quality control, analysis, and exploration of single cell RNA sequencing data. 'Seurat' aims to enable users to identify and interpret sources of heterogeneity from single cell transcriptomic measurements, and to integrate diverse types of single cell data. See Satija R, Farrell J, Gennert D, et al (2015) \doi{10.1038/nbt.3192}, Macosko E, Basu A, Satija R, et al (2015) \doi{10.1016/j.cell.2015.05.002}, Stuart T, Butler A, et al (2019) \doi{10.1016/j.cell.2019.05.031}, Hao, Hao, et al (2020) \doi{10.1101/2020.10.12.335331}, Jiang, et al (2026) for more details.
 }
 \section{Package options}{
 
@@ -71,7 +71,7 @@ Other contributors:
   \item Avi Srivastava \email{asrivastava@nygenome.org} (\href{https://orcid.org/0000-0001-9798-2079}{ORCID}) [contributor]
   \item Tim Stuart \email{tstuart@nygenome.org} (\href{https://orcid.org/0000-0002-3044-0897}{ORCID}) [contributor]
   \item Kristof Torkenczy (\href{https://orcid.org/0000-0002-4869-7957}{ORCID}) [contributor]
-  \item Brian Zhang \email{brianzhang@nygenome.org} [contributor]
+  \item Brian Zhang \email{brianzhang@nygenome.org} (\href{https://orcid.org/0009-0008-1011-5983}{ORCID}) [contributor]
   \item Shiwei Zheng \email{szheng@nygenome.org} (\href{https://orcid.org/0000-0001-6682-6743}{ORCID}) [contributor]
   \item Satija Lab and Collaborators [funder]
 }

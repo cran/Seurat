@@ -1,4 +1,48 @@
-# Seurat 5.6.0
+# Seurat 6.0.0
+
+### Additions
+
+- Added scSLIDE (Single-cell Sample-Level Inference using Density Estimation) to Seurat, enabling sample-level analysis of single-cell data
+  - Added `PrepareSampleObject` to select landmark cells and map every cell to its nearest landmarks
+  - Added `SketchDataByGroup` to sketch cells within metadata groups using uniform or leverage-score sampling, with configurable cell counts per group and layer
+  - Added `QuickCorTest` to select genes correlated with a response variable, optionally within metadata groups
+  - Added `RunPLS` to compute a partial least squares (PLS) dimensional reduction, whose components capture the variation in expression most predictive of one or more sample- or cell-level responses (supports `plsr`, `cppls` and `spls`)
+  - Added `FindmmNN` and `FindsmNN` to map cells to landmarks using weighted combinations of reductions or a single reduction, respectively
+  - Added `GenerateSampleObject` to summarize landmark assignments per sample into a Seurat object for downstream sample-level analysis
+  - Added `NormalizeChiSquared` to normalize raw landmark-by-sample counts as deviations from expected counts
+  - Added `RunDiffusionMap` to compute a diffusion map reduction with `destiny`, including support for a precomputed distance matrix and eigenvalue-weighted embeddings
+  - Added `TrajDETest` to test expression changes along a continuous trajectory using negative binomial regression with `glmGamPoi`
+  - Added `PlotAnnotatedHeatmap` to display expression heatmaps with cells or samples ordered by metadata variables and optional categorical or continuous annotation bars
+- Added `ReadAtera` and `LoadAtera` to read 10x Genomics Atera spatial data, including expression and control counts, Azimuth cell type annotations, cell centroids, cell/nucleus segmentations, transcript coordinates, and morphology images
+  - Added support for gene selection when reading molecules, feature-type selection when reading counts, BPCells-backed counts caching, and parallel Atera reads using the active `future::plan()`
+  - Added `LoadAteraMolecules`, `LoadAteraSegmentations`, and `LoadAteraCodewords` to load additional transcript coordinates, segmentation polygons, and per-codeword coordinates into existing Atera objects
+- Added gene and region selection to `ReadXenium` and `LoadXenium` for molecule coordinates
+
+### Fixes
+
+- Fixed `LeverageScore` (and so `SketchData`) on objects with fewer than 50 features or cells by using the number of components already computed from the object's size
+- Updated `LeverageScore` (and so `SketchData`) to scale better on BPCells on-disk data, by computing the random projection in blocks of cells instead of transposing the whole matrix. Results for a given `seed` differ from previous versions
+- Fixed `LeverageScore` on BPCells on-disk data deleting unrelated files from the session temporary directory and leaving behind a full on-disk copy of the input matrix
+- Fixed `LeverageScore` densifying the whole layer when retrying after a failure, and reporting that no zero-variance features were found even when it had removed some
+- Fixed `ProjectData` and `TransferSketchLabels` not preserving factor levels and ordering in projected labels
+- Fixed SCT query projection using the resolved reference variance floor instead of the original `"umi_median"` setting, which could reduce anchors in `FindTransferAnchors` and cause `TransferData` to fail
+- Improved table reading in `Read10X`, `ReadMtx`, `LoadSTARmap`, `LoadCurioSeeker`, and `ReadSlideSeq`, and coordinate handling in `SpatialPlot`
+- Fixed `Load10X_Spatial` with custom assay and slice names and uppercase feature names, and cell filtering in `Read10X_Coordinates`, `Read10X_Segmentations`, and `Read10X_HD_GeoJson`
+- Fixed `ImageDimPlot` and `ImageFeaturePlot` with FOV and boundary names containing underscores
+- Fixed default orientation in `ImageDimPlot` and `ImageFeaturePlot` for spatial `FOV`s, including older Xenium/Atera objects: x is horizontal and y increases downward; stored coordinates are unchanged
+- Fixed transcript quality filtering and count reader error reporting in `ReadXenium`
+- Fixed `LoadXenium` molecule labels to match assay feature names when underscores or pipes are replaced with dashes
+- Reduced data exported to parallel workers by passing selected inputs directly
+  - Per-object inputs in `PrepSCTIntegration`, `FindIntegrationAnchors`, `MapQueryData`, and `BridgeCellsRepresentation`
+  - Feature chunks in `RunMarkVario`
+  - Cell names per field of view for segmentations and cell metadata rows for bounding boxes in `ReadVizgen`
+
+### Deprecations
+
+- Soft deprecation of `flip.xy` in `LoadXenium`
+  - Existing calls with `flip.xy = TRUE` will retain their behavior (requiring SeuratObject >= v5.3.0 to do so)
+
+# Seurat 5.6.0 (2026-10-03)
 
 ### Additions
 
@@ -41,7 +85,7 @@
 - Fixed `SCTransform` on v5 assays to preserve features selected by `variable.features.rv.th` when `variable.features.n = NULL`, including across multiple layers
 - Fixed reference-based RPCA/CCA anchor finding to exclude query-query comparisons regardless of `verbose`
 
-# Seurat 5.5.1
+# Seurat 5.5.1 (2026-06-26)
 
 ### Additions
 
@@ -55,7 +99,7 @@
 - Fixed bug in `PrepDR5` affecting `RunPCA` on v5 objects, where supplied features could be incorrectly dropped when non-supplied features had zero variance ([#10398](https://github.com/satijalab/seurat/pull/10398))
 - Updated `LabelClusters` to use `fill` argument for label background color in `geom_label*` when specified, instead of the default per-cluster color ([#10404](https://github.com/satijalab/seurat/pull/10404))
 
-# Seurat 5.5.0
+# Seurat 5.5.0 (2026-04-22)
 
 ### Additions
 
@@ -95,7 +139,7 @@
 - Updated coordinate systems used for plot display in `InteractiveSpatialPlot` ([#10254](https://github.com/satijalab/seurat/pull/10254))
 - Fixed coordinate ranges when spatial plots are generated with `crop = F` ([#10278](https://github.com/satijalab/seurat/pull/10278), [#10284](https://github.com/satijalab/seurat/pull/10284))
 
-# Seurat 5.4.0
+# Seurat 5.4.0 (2025-12-14)
 
 ### Additions
 - Added support for 10x Space Ranger 4.0 outputs (Visium data with segmentations)
@@ -111,7 +155,7 @@
 - Reverted [#10062](https://github.com/satijalab/seurat/pull/10062) in favor of fetching both grouping variables and dimensionality reduction embeddings with `FetchData` as previously; added warning to alert users when column names of metadata and dimensionality reduction embeddings conflict
 - Added color retrieval logic in `LabelClusters` for consistent cluster label coloring ([#10198](https://github.com/satijalab/seurat/pull/10198))
 
-# Seurat 5.3.1
+# Seurat 5.3.1 (2025-10-29)
 
 ## Changes
 
@@ -137,7 +181,7 @@
 - Updated visualization functions to avoid ggplot2 `guides`, `aes_string`, and `facet_grid` deprecation warnings ([#9409](https://github.com/satijalab/seurat/pull/9409), [#10116](https://github.com/satijalab/seurat/pull/10116))
 - Fixed `DimPlot` bug where metadata columns named 'PC_1', 'UMAP_1' etc override reduction embeddings ([#10062](https://github.com/satijalab/seurat/pull/10062))
 
-# Seurat 5.3.0
+# Seurat 5.3.0 (2025-04-24)
 
 ## Changes
 - Fixed `PseudobulkExpression` to forward relevant arguments to `NormalizeData` ([#9840](https://github.com/satijalab/seurat/pull/9840))
